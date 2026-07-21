@@ -1,0 +1,53 @@
+@baseUrl = http://localhost:8000
+@adminKey = change-me-admin-key
+@tenantKey = demo-acme-api-key
+
+### Health check
+GET {{baseUrl}}/health
+
+### Provision a tenant (copy the returned api_key if one is not supplied)
+POST {{baseUrl}}/tenants
+X-API-Key: {{adminKey}}
+Content-Type: application/json
+
+{
+  "name": "New Distribution Co",
+  "external_odoo_instance_id": "odoo-newco",
+  "api_key": "newco-local-secret-key"
+}
+
+### List tenant customers
+GET {{baseUrl}}/customers?page=1&page_size=20&sync_status=pending
+X-API-Key: {{tenantKey}}
+
+### Create a customer idempotently
+POST {{baseUrl}}/customers
+X-API-Key: {{tenantKey}}
+Idempotency-Key: customer-demo-001
+Content-Type: application/json
+
+{
+  "name": "Prismatic Demo Buyer",
+  "email": "buyer@example.com",
+  "phone": "+1-555-0199"
+}
+
+### Poll pending integration events (Prismatic flow trigger)
+GET {{baseUrl}}/integration-events?status=pending&page_size=100
+X-API-Key: {{tenantKey}}
+
+### Odoo result callback (replace entity_id)
+POST {{baseUrl}}/webhooks/odoo
+X-API-Key: {{tenantKey}}
+Content-Type: application/json
+
+{
+  "entity_type": "order",
+  "entity_id": "replace-with-order-id",
+  "external_id": "ODOO-SO-10042",
+  "invoice_status": "invoiced",
+  "payment_status": "paid",
+  "delivery_status": "delivered",
+  "synchronization_result": "success",
+  "metadata": {"prismatic_execution_id": "example-execution-id"}
+}

@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Veridata Commerce Nexus | Prismatic & Odoo Integration SaaS</title>
+  <meta name="description" content="Multi-tenant B2B order management SaaS application showcasing embedded integration with Odoo through Prismatic.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+  <div id="app" class="app-container">
+    <!-- Top Bar Header -->
+    <header class="top-header">
+      <div class="brand-area">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>Veridata Commerce Nexus</h1>
+          <span class="sub-badge">Prismatic &amp; Odoo Integration Hub</span>
+        </div>
+      </div>
+
+      <div class="header-controls">
+        <!-- System Health Indicator -->
+        <div class="health-status" id="health-status-badge">
+          <span class="status-dot pulsing"></span>
+          <span class="status-label">Checking API...</span>
+        </div>
+
+        <!-- Tenant Selector -->
+        <div class="tenant-selector-box">
+          <label for="tenant-select" class="tenant-label">Active Tenant:</label>
+          <div class="custom-select-wrapper">
+            <select id="tenant-select" class="tenant-select">
+              <option value="demo-acme-api-key">Acme Distribution (odoo-acme)</option>
+              <option value="demo-globex-api-key">Globex Wholesale (odoo-globex)</option>
+              <option value="custom">-- Custom API Key / Admin --</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Key Input Modal Trigger / Key Display -->
+        <div class="api-key-pill">
+          <span class="key-icon">🔑</span>
+          <span id="active-key-display" class="key-text">demo-acme-api-key</span>
+          <button id="btn-edit-key" class="btn-icon" title="Change API Key" onclick="App.promptApiKey()">✏️</button>
+        </div>
+
+        <!-- Theme Toggle Button -->
+        <button id="btn-theme-toggle" class="theme-toggle-btn" title="Toggle Light/Dark Theme" onclick="App.toggleTheme()">
+          <span id="theme-icon">☀️</span> <span id="theme-label">Light</span>
+        </button>
+
+        <!-- Seed Database Quick Action -->
+        <button class="btn btn-secondary btn-sm" onclick="App.seedDatabase()" title="Seed Demo Tenants & Records">
+          🌱 Seed DB
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Navigation Bar -->
+    <nav class="nav-bar">
+      <div class="nav-tabs">
+        <button class="nav-tab active" data-tab="overview">
+          <span class="tab-icon">📊</span> Overview
+        </button>
+        <button class="nav-tab" data-tab="customers">
+          <span class="tab-icon">👥</span> Customers
+        </button>
+        <button class="nav-tab" data-tab="products">
+          <span class="tab-icon">📦</span> Products
+        </button>
+        <button class="nav-tab" data-tab="orders">
+          <span class="tab-icon">🛒</span> Orders
+        </button>
+        <button class="nav-tab" data-tab="events">
+          <span class="tab-icon">⚡</span> Integration Events
+        </button>
+        <button class="nav-tab" data-tab="webhooks">
+          <span class="tab-icon">🔄</span> Odoo Webhook Simulator
+        </button>
+        <button class="nav-tab" data-tab="admin">
+          <span class="tab-icon">🏢</span> Tenant Admin
+        </button>
+        <button class="nav-tab" data-tab="idempotency">
+          <span class="tab-icon">🧪</span> Idempotency Sandbox
+        </button>
+      </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- 1. OVERVIEW TAB -->
+      <section id="tab-overview" class="tab-panel active">
+        <div class="dashboard-hero">
+          <div class="hero-content">
+            <h2>Multi-Tenant B2B Integration Architecture</h2>
+            <p>Veridata Commerce Nexus syncs customers, products, and order state with Odoo ERP via Prismatic integration flows using asynchronous IntegrationEvents and webhook callbacks.</p>
+          </div>
+          <div class="hero-actions">
+            <button class="btn btn-primary" onclick="App.openCreateOrderModal()">+ Quick Create Order</button>
+            <button class="btn btn-secondary" onclick="App.switchTab('webhooks')">Simulate Odoo Webhook</button>
+          </div>
+        </div>
+
+        <!-- Metrics Grid -->
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="metric-icon customers">👥</div>
+            <div class="metric-info">
+              <span class="metric-label">Total Customers</span>
+              <h3 class="metric-value" id="metric-customers-count">-</h3>
+              <span class="metric-sub" id="metric-customers-synced">- synced</span>
+            </div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-icon products">📦</div>
+            <div class="metric-info">
+              <span class="metric-label">Product SKU Catalog</span>
+              <h3 class="metric-value" id="metric-products-count">-</h3>
+              <span class="metric-sub" id="metric-products-instock">- in stock</span>
+            </div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-icon orders">🛒</div>
+            <div class="metric-info">
+              <span class="metric-label">Active Orders</span>
+              <h3 class="metric-value" id="metric-orders-count">-</h3>
+              <span class="metric-sub" id="metric-orders-revenue">$0.00 total</span>
+            </div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-icon events">⚡</div>
+            <div class="metric-info">
+              <span class="metric-label">Integration Events</span>
+              <h3 class="metric-value" id="metric-events-count">-</h3>
+              <span class="metric-sub" id="metric-events-status">- pending</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pipeline Architecture & Recent Activity -->
+        <div class="dashboard-grid">
+          <!-- Architecture Flow Diagram Card -->
+          <div class="glass-card pipeline-card">
+            <div class="card-header">
+              <h3>Prismatic &lt;-&gt; Odoo Sync Pipeline</h3>
+              <span class="badge badge-info">Multi-Tenant Architecture</span>
+            </div>
+            <div class="pipeline-flow">
+              <div class="flow-step">
+                <div class="step-box saas">
+                  <span class="step-icon">🏢</span>
+                  <span class="step-title">Veridata SaaS</span>
+                  <span class="step-desc">Create / Update Operations</span>
+                </div>
+              </div>
+              <div class="flow-arrow">➡️</div>
+              <div class="flow-step">
+                <div class="step-box bus">
+                  <span class="step-icon">⚡</span>
+                  <span class="step-title">Integration Event Bus</span>
+                  <span class="step-desc">Event Queue &amp; Retry</span>
+                </div>
+              </div>
+              <div class="flow-arrow">➡️</div>
+              <div class="flow-step">
+                <div class="step-box prismatic">
+                  <span class="step-icon">🔌</span>
+                  <span class="step-title">Prismatic IPaaS</span>
+                  <span class="step-desc">Embedded Integration</span>
+                </div>
+              </div>
+              <div class="flow-arrow">➡️</div>
+              <div class="flow-step">
+                <div class="step-box odoo">
+                  <span class="step-icon">🟣</span>
+                  <span class="step-title">Odoo ERP</span>
+                  <span class="step-desc">External Instance</span>
+                </div>
+              </div>
+            </div>
+            <div class="pipeline-return">
+              <span class="return-arrow">↩️ Webhook Return Path: <code>POST /webhooks/odoo</code> updates status, external IDs, invoice &amp; payment state</span>
+            </div>
+          </div>
+
+          <!-- Recent Events Activity Stream -->
+          <div class="glass-card activity-card">
+            <div class="card-header">
+              <h3>Recent Integration Activity</h3>
+              <button class="btn btn-sm btn-ghost" onclick="App.refreshOverview()">Refresh</button>
+            </div>
+            <div class="activity-list" id="overview-activity-list">
+              <div class="loading-state">Loading recent events...</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. CUSTOMERS TAB -->
+      <section id="tab-customers" class="tab-panel">
+        <div class="table-toolbar">
+          <div class="filter-group">
+            <input type="text" id="customer-search" class="input-search" placeholder="Search customer by name or email..." oninput="App.loadCustomers()">
+            <select id="customer-sync-filter" class="select-filter" onchange="App.loadCustomers()">
+              <option value="">All Sync Statuses</option>
+              <option value="success">Synced (success)</option>
+              <option value="pending">Pending</option>
+              <option value="failed">Failed</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="App.openCustomerModal()">+ Add Customer</button>
+        </div>
+
+        <div class="glass-card table-card">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Customer ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>External Odoo ID</th>
+                <th>Sync Status</th>
+                <th>Updated</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="customers-table-body">
+              <tr><td colspan="8" class="text-center">Loading customers...</td></tr>
+            </tbody>
+          </table>
+          <div class="table-footer" id="customers-pagination"></div>
+        </div>
+      </section>
+
+      <!-- 3. PRODUCTS TAB -->
+      <section id="tab-products" class="tab-panel">
+        <div class="table-toolbar">
+          <div class="filter-group">
+            <input type="text" id="product-search" class="input-search" placeholder="Search products by SKU or name..." oninput="App.loadProducts()">
+            <select id="product-stock-filter" class="select-filter" onchange="App.loadProducts()">
+              <option value="">All Stock Levels</option>
+              <option value="true">In Stock Only</option>
+              <option value="false">Out of Stock</option>
+            </select>
+            <select id="product-sync-filter" class="select-filter" onchange="App.loadProducts()">
+              <option value="">All Sync Statuses</option>
+              <option value="success">Synced (success)</option>
+              <option value="pending">Pending</option>
+              <option value="failed">Failed</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="App.openProductModal()">+ Add Product</button>
+        </div>
+
+        <div class="glass-card table-card">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>SKU</th>
+                <th>Product Name</th>
+                <th>Unit Price</th>
+                <th>Stock Quantity</th>
+                <th>External Odoo ID</th>
+                <th>Sync Status</th>
+                <th>Updated</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="products-table-body">
+              <tr><td colspan="8" class="text-center">Loading products...</td></tr>
+            </tbody>
+          </table>
+          <div class="table-footer" id="products-pagination"></div>
+        </div>
+      </section>
+
+      <!-- 4. ORDERS TAB -->
+      <section id="tab-orders" class="tab-panel">
+        <div class="table-toolbar">
+          <div class="filter-group">
+            <select id="order-status-filter" class="select-filter" onchange="App.loadOrders()">
+              <option value="">All Order Statuses</option>
+              <option value="draft">Draft</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="fulfilled">Fulfilled</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+            <select id="order-sync-filter" class="select-filter" onchange="App.loadOrders()">
+              <option value="">All Sync Statuses</option>
+              <option value="success">Synced (success)</option>
+              <option value="pending">Pending</option>
+              <option value="failed">Failed</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="App.openCreateOrderModal()">+ New B2B Order</button>
+        </div>
+
+        <div class="glass-card table-card">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Order ID</th>
+                <th>Customer</th>
+                <th>Total Amount</th>
+                <th>Order Status</th>
+                <th>External Odoo ID</th>
+                <th>Invoice / Payment / Delivery</th>
+                <th>Sync Status</th>
+                <th>Created</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="orders-table-body">
+              <tr><td colspan="9" class="text-center">Loading orders...</td></tr>
+            </tbody>
+          </table>
+          <div class="table-footer" id="orders-pagination"></div>
+        </div>
+      </section>
+
+      <!-- 5. INTEGRATION EVENTS TAB -->
+      <section id="tab-events" class="tab-panel">
+        <div class="table-toolbar">
+          <div class="filter-group">
+            <select id="event-type-filter" class="select-filter" onchange="App.loadEvents()">
+              <option value="">All Event Types</option>
+              <option value="customer.created">customer.created</option>
+              <option value="customer.updated">customer.updated</option>
+              <option value="product.created">product.created</option>
+              <option value="product.updated">product.updated</option>
+              <option value="order.created">order.created</option>
+              <option value="order.status_changed">order.status_changed</option>
+            </select>
+            <select id="event-status-filter" class="select-filter" onchange="App.loadEvents()">
+              <option value="">All Event Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="processed">Processed</option>
+              <option value="failed">Failed</option>
+            </select>
+          </div>
+          <button class="btn btn-secondary" onclick="App.loadEvents()">🔄 Refresh Log</button>
+        </div>
+
+        <div class="glass-card table-card">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Event ID</th>
+                <th>Event Type</th>
+                <th>Entity Type</th>
+                <th>Entity ID</th>
+                <th>Status</th>
+                <th>Retry Count</th>
+                <th>Created At</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="events-table-body">
+              <tr><td colspan="8" class="text-center">Loading integration events...</td></tr>
+            </tbody>
+          </table>
+          <div class="table-footer" id="events-pagination"></div>
+        </div>
+      </section>
+
+      <!-- 6. ODOO WEBHOOK SIMULATOR TAB -->
+      <section id="tab-webhooks" class="tab-panel">
+        <div class="glass-card simulator-card">
+          <div class="card-header">
+            <h3>Prismatic -&gt; SaaS Odoo Webhook Receiver Simulator</h3>
+            <span class="badge badge-purple">POST /webhooks/odoo</span>
+          </div>
+          <p class="sim-intro">Simulate incoming webhook sync callbacks dispatched from Prismatic back into the Veridata SaaS API. This updates external IDs, ERP invoice/payment/delivery flags, and sync status on the target entity.</p>
+
+          <form id="webhook-form" onsubmit="App.submitWebhookSim(event)" class="webhook-form-grid">
+            <div class="form-group">
+              <label>Target Entity Type</label>
+              <select id="sim-entity-type" class="select-input" required onchange="App.updateWebhookFormFields()">
+                <option value="order">Order</option>
+                <option value="customer">Customer</option>
+                <option value="product">Product</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>SaaS Entity ID (UUID)</label>
+              <input type="text" id="sim-entity-id" class="text-input" placeholder="e.g. uuid of order/customer/product" required>
+              <small class="help-text">Tip: Select an ID from your loaded tables or paste one.</small>
+            </div>
+
+            <div class="form-group">
+              <label>External Odoo ID</label>
+              <input type="text" id="sim-external-id" class="text-input" placeholder="e.g. ODOO-SO-101" required>
+            </div>
+
+            <div class="form-group">
+              <label>Sync Status Result</label>
+              <select id="sim-sync-status" class="select-input" required>
+                <option value="success">Success</option>
+                <option value="failed">Failed</option>
+              </select>
+            </div>
+
+            <!-- Order specific ERP fields -->
+            <div id="sim-order-fields" class="order-extra-fields">
+              <div class="form-group">
+                <label>Odoo Invoice Status</label>
+                <select id="sim-invoice-status" class="select-input">
+                  <option value="not_invoiced">Not Invoiced</option>
+                  <option value="invoiced">Invoiced</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label>Odoo Payment Status</label>
+                <select id="sim-payment-status" class="select-input">
+                  <option value="unpaid">Unpaid</option>
+                  <option value="paid">Paid</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label>Odoo Delivery Status</label>
+                <select id="sim-delivery-status" class="select-input">
+                  <option value="pending">Pending</option>
+                  <option value="delivered">Delivered</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group full-width">
+              <label>Sync Error (Optional)</label>
+              <input type="text" id="sim-sync-error" class="text-input" placeholder="e.g. Odoo connection timeout or validation error">
+            </div>
+
+            <div class="form-actions full-width">
+              <button type="submit" class="btn btn-primary">🚀 Send Webhook Update</button>
+            </div>
+          </form>
+
+          <div class="webhook-result-box hidden" id="sim-result-box">
+            <h4>Webhook Execution Response</h4>
+            <pre><code id="sim-result-code"></code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- 7. TENANT ADMIN TAB -->
+      <section id="tab-admin" class="tab-panel">
+        <div class="table-toolbar">
+          <div class="admin-key-bar">
+            <span>Admin Key Mode:</span>
+            <input type="text" id="admin-key-input" class="text-input sm" value="change-me-admin-key" placeholder="Enter Admin API Key">
+            <button class="btn btn-secondary btn-sm" onclick="App.loadTenants()">Verify &amp; Load Tenants</button>
+          </div>
+          <button class="btn btn-primary" onclick="App.openCreateTenantModal()">+ Create Tenant</button>
+        </div>
+
+        <div class="glass-card table-card">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Tenant ID</th>
+                <th>Tenant Name</th>
+                <th>External Odoo Instance ID</th>
+                <th>Created At</th>
+              </tr>
+            </thead>
+            <tbody id="tenants-table-body">
+              <tr><td colspan="4" class="text-center">Enter admin key and click "Verify &amp; Load Tenants".</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 8. IDEMPOTENCY SANDBOX TAB -->
+      <section id="tab-idempotency" class="tab-panel">
+        <div class="glass-card sandbox-card">
+          <div class="card-header">
+            <h3>Idempotency-Key Header Demonstration</h3>
+            <span class="badge badge-warning">HTTP Header Validation</span>
+          </div>
+          <p class="sim-intro">Test the API's duplicate prevention mechanism. When a request includes an <code>Idempotency-Key</code>, re-submitting the exact same key will return the cached response without creating duplicate database records or raising duplicate event triggers.</p>
+
+          <div class="sandbox-controls">
+            <div class="form-group">
+              <label>Idempotency Key Header:</label>
+              <div class="input-with-button">
+                <input type="text" id="sandbox-key" class="text-input" readonly>
+                <button class="btn btn-secondary" onclick="App.generateNewSandboxKey()">🔄 New Random Key</button>
+              </div>
+            </div>
+
+            <div class="sandbox-actions">
+              <button class="btn btn-primary" onclick="App.testIdempotencyRequest(1)">Submit First Request (Creates Entity)</button>
+              <button class="btn btn-warning" onclick="App.testIdempotencyRequest(2)">Submit Duplicate Request (Returns Cached Result)</button>
+            </div>
+          </div>
+
+          <div class="sandbox-output-grid">
+            <div class="output-box">
+              <h4>Response 1 (Initial Request)</h4>
+              <div class="status-code" id="sandbox-status-1">-</div>
+              <pre><code id="sandbox-code-1">// Click "Submit First Request"</code></pre>
+            </div>
+            <div class="output-box">
+              <h4>Response 2 (Duplicate Idempotency Key)</h4>
+              <div class="status-code" id="sandbox-status-2">-</div>
+              <pre><code id="sandbox-code-2">// Click "Submit Duplicate Request"</code></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="app-footer">
+      <span>Veridata Commerce Nexus SaaS &bull; Embedded Prismatic Odoo Integration Demo</span>
+      <span>API Docs: <a href="/docs" target="_blank" rel="noopener">OpenAPI / Swagger Specs</a></span>
+    </footer>
+  </div>
+
+  <!-- MODALS -->
+  <!-- 1. Customer Modal -->
+  <dialog id="modal-customer" class="app-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-customer-title">Add New Customer</h3>
+        <button class="btn-close" onclick="App.closeModal('modal-customer')">&times;</button>
+      </div>
+      <form id="form-customer" onsubmit="App.saveCustomer(event)">
+        <input type="hidden" id="cust-id">
+        <div class="form-group">
+          <label>Customer Name</label>
+          <input type="text" id="cust-name" class="text-input" required placeholder="e.g. Apex Industrial Supplies">
+        </div>
+        <div class="form-group">
+          <label>Email Address</label>
+          <input type="email" id="cust-email" class="text-input" required placeholder="e.g. purchasing@apex.example">
+        </div>
+        <div class="form-group">
+          <label>Phone Number</label>
+          <input type="text" id="cust-phone" class="text-input" placeholder="e.g. +1-555-0199">
+        </div>
+        <div class="form-group">
+          <label>External Odoo Partner ID (Optional)</label>
+          <input type="text" id="cust-external-id" class="text-input" placeholder="e.g. ODOO-C-101">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" onclick="App.closeModal('modal-customer')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Customer</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- 2. Product Modal -->
+  <dialog id="modal-product" class="app-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-product-title">Add New Product</h3>
+        <button class="btn-close" onclick="App.closeModal('modal-product')">&times;</button>
+      </div>
+      <form id="form-product" onsubmit="App.saveProduct(event)">
+        <input type="hidden" id="prod-id">
+        <div class="form-group">
+          <label>SKU Code</label>
+          <input type="text" id="prod-sku" class="text-input" required placeholder="e.g. SKU-9901">
+        </div>
+        <div class="form-group">
+          <label>Product Name</label>
+          <input type="text" id="prod-name" class="text-input" required placeholder="e.g. Premium Hydraulic Valve">
+        </div>
+        <div class="form-group">
+          <label>Price ($ USD)</label>
+          <input type="number" step="0.01" min="0" id="prod-price" class="text-input" required placeholder="99.99">
+        </div>
+        <div class="form-group">
+          <label>Stock Quantity</label>
+          <input type="number" min="0" id="prod-stock" class="text-input" required placeholder="50">
+        </div>
+        <div class="form-group">
+          <label>External Odoo Product ID (Optional)</label>
+          <input type="text" id="prod-external-id" class="text-input" placeholder="e.g. ODOO-P-202">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" onclick="App.closeModal('modal-product')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Product</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- 3. Create Order Wizard Modal -->
+  <dialog id="modal-order" class="app-modal large">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Create New B2B Order</h3>
+        <button class="btn-close" onclick="App.closeModal('modal-order')">&times;</button>
+      </div>
+      <form id="form-order" onsubmit="App.saveOrder(event)">
+        <div class="form-group">
+          <label>Select Customer</label>
+          <select id="order-customer-select" class="select-input" required>
+            <option value="">-- Choose Customer --</option>
+          </select>
+        </div>
+
+        <div class="order-items-section">
+          <div class="section-title">
+            <h4>Order Line Items</h4>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="App.addOrderLineItem()">+ Add Line Item</button>
+          </div>
+          <div id="order-items-container" class="order-items-list">
+            <!-- Line items dynamically appended -->
+          </div>
+        </div>
+
+        <div class="order-summary-bar">
+          <span>Total Order Value:</span>
+          <span id="order-wizard-total" class="total-price-text">$0.00</span>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" onclick="App.closeModal('modal-order')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Submit &amp; Generate Order</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- 4. Update Order Status Modal -->
+  <dialog id="modal-order-status" class="app-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Update Order Status</h3>
+        <button class="btn-close" onclick="App.closeModal('modal-order-status')">&times;</button>
+      </div>
+      <form id="form-order-status" onsubmit="App.saveOrderStatus(event)">
+        <input type="hidden" id="status-order-id">
+        <div class="form-group">
+          <label>Target Status</label>
+          <select id="status-select" class="select-input" required>
+            <option value="draft">Draft</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="fulfilled">Fulfilled</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+        <p class="help-text">Updating status generates an <code>order.status_changed</code> event for Prismatic to sync with Odoo.</p>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" onclick="App.closeModal('modal-order-status')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Update Status</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- 5. Event JSON Payload View Modal -->
+  <dialog id="modal-event-json" class="app-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="event-json-title">Integration Event Payload</h3>
+        <button class="btn-close" onclick="App.closeModal('modal-event-json')">&times;</button>
+      </div>
+      <div class="json-body">
+        <pre><code id="event-json-code"></code></pre>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="App.closeModal('modal-event-json')">Close</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- 6. Create Tenant Modal -->
+  <dialog id="modal-tenant" class="app-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Create New Multi-Tenant Workspace</h3>
+        <button class="btn-close" onclick="App.closeModal('modal-tenant')">&times;</button>
+      </div>
+      <form id="form-tenant" onsubmit="App.saveTenant(event)">
+        <div class="form-group">
+          <label>Tenant Name</label>
+          <input type="text" id="tenant-name-input" class="text-input" required placeholder="e.g. Cyberdyne Logistics">
+        </div>
+        <div class="form-group">
+          <label>External Odoo Instance ID</label>
+          <input type="text" id="tenant-odoo-input" class="text-input" required placeholder="e.g. odoo-cyberdyne">
+        </div>
+        <div class="form-group">
+          <label>API Key (Optional, auto-generated if left blank)</label>
+          <input type="text" id="tenant-key-input" class="text-input" placeholder="e.g. demo-cyberdyne-api-key">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" onclick="App.closeModal('modal-tenant')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Tenant</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Main JavaScript App Entry -->
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
