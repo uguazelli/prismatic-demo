@@ -131,16 +131,45 @@ curl -X POST http://localhost:8000/orders \
 
 The complete runnable request set is in [`requests/demo.http`](requests/demo.http).
 
-## How Prismatic consumes events
+## How Commerce Nexus invokes Prismatic
 
-Every business create/update writes its record and an `IntegrationEvent` in the same database transaction. A Prismatic flow can run on a schedule and call:
+Every business create/update writes its record and an `IntegrationEvent` in the same database transaction. When the Prismatic webhook is configured, a background dispatcher sends `customer.created` and `customer.updated` events to the flow with an HTTP `POST`. Reads do not invoke the flow.
+
+Configure the deployment in `.env` (never commit the real API key):
+
+```dotenv
+PRISMATIC_WEBHOOK_URL=https://hooks.prismatic.io/trigger/your-instance-flow-id
+PRISMATIC_API_KEY=replace-with-a-rotated-key
+```
+
+The request includes the configured `api-key`, the integration event ID as `Idempotency-Key`, and this JSON envelope:
+
+```json
+{
+  "event_id": "integration-event-uuid",
+  "event_type": "customer.created",
+  "entity_type": "customer",
+  "entity_id": "customer-uuid",
+  "tenant_id": "tenant-uuid",
+  "occurred_at": "2026-07-22T12:00:00+00:00",
+  "payload": {
+    "id": "customer-uuid",
+    "name": "Ada Buyer",
+    "email": "ada@example.com"
+  }
+}
+```
+
+Prismatic exposes the JSON under the trigger result's body data. The dispatcher follows synchronous-result redirects, uses exponential retry delays, and changes the event from `pending` to `dispatched` after Prismatic accepts it. After the flow completes its Odoo work, it calls the Commerce Nexus callback described below; that marks the event `processed` or `failed`.
+
+The event API remains useful for monitoring or manual recovery:
 
 ```http
-GET /integration-events?status=pending&page=1&page_size=100
+GET /integration-events?page=1&page_size=100
 X-API-Key: <tenant key>
 ```
 
-Each event contains `event_type`, `entity_type`, `entity_id`, and a complete JSON snapshot in `payload`. Typical mappings are:
+Typical mappings are:
 
 | Event | Suggested Odoo action |
 |---|---|
@@ -149,14 +178,14 @@ Each event contains `event_type`, `entity_type`, `entity_id`, and a complete JSO
 | `order.created` | Create a sales order |
 | `order.status_changed` | Update/confirm/cancel a sales order |
 
-Prismatic should use the event `id` as its own idempotency/correlation value, perform the Odoo action, then call the Odoo webhook below. The callback marks the latest pending outbound event for that entity as `processed` or `failed` and creates an `odoo.webhook.received` audit event. A failed event can be returned to `pending` with:
+Prismatic should use the event `id` as its own idempotency/correlation value, perform the Odoo action, then call the Odoo webhook below. The callback marks the latest dispatched outbound event for that entity as `processed` or `failed` and creates an `odoo.webhook.received` audit event. A failed event can be returned to `pending` with:
 
 ```http
 POST /integration-events/{event_id}/retry
 X-API-Key: <tenant key>
 ```
 
-The retry endpoint increments `retry_count`; Prismatic can pick it up on the next poll.
+The retry endpoint resets delivery-attempt state so the dispatcher can send it again. For a production deployment with multiple API replicas, run the dispatcher as one dedicated worker or add database row claiming so two replicas cannot deliver the same event simultaneously.
 
 ## How Prismatic sends Odoo updates back
 
@@ -168,6 +197,7 @@ curl -X POST http://localhost:8000/webhooks/odoo \
   -H 'Content-Type: application/json' \
   -d '{
     "entity_type":"order",
+    "event_id":"INTEGRATION_EVENT_ID",
     "entity_id":"INTERNAL_ORDER_ID",
     "external_id":"ODOO-SO-10042",
     "invoice_status":"invoiced",

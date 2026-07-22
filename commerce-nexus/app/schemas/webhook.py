@@ -6,6 +6,7 @@ from app.schemas.common import ApiSchema
 
 
 class OdooWebhook(ApiSchema):
+    event_id: str | None = Field(default=None, max_length=36)
     entity_type: Literal["customer", "product", "order"]
     entity_id: str | None = None
     external_id: str | None = Field(default=None, max_length=255)

@@ -1,8 +1,12 @@
+import json
+
+import httpx
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import Customer, IntegrationEvent, Order
+from app.events.dispatcher import dispatch_event
 from tests.conftest import auth
 
 
@@ -32,6 +36,84 @@ def test_customer_creation_and_event(client: TestClient, tenants, db_session: Se
     assert event is not None
     assert event.event_type == "customer.created"
     assert event.payload["email"] == "ada@example.com"
+
+
+def test_customer_event_is_dispatched_to_prismatic(
+    client: TestClient, tenants, db_session: Session
+):
+    tenant = tenants[0]
+    response = client.post(
+        "/customers",
+        headers=auth(tenant["key"]),
+        json={"name": "Grace Buyer", "email": "grace@example.com"},
+    )
+    event = db_session.scalar(
+        select(IntegrationEvent).where(IntegrationEvent.entity_id == response.json()["id"])
+    )
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["headers"] = request.headers
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(200, json={"executionId": "execution-123"})
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as webhook_client:
+        delivered = dispatch_event(
+            db_session,
+            event,
+            client=webhook_client,
+            webhook_url="https://hooks.prismatic.io/trigger/test",
+            api_key="test-prismatic-key",
+        )
+
+    assert delivered is True
+    assert event.status == "dispatched"
+    assert event.last_attempted_at is not None
+    assert event.last_error is None
+    assert captured["headers"]["api-key"] == "test-prismatic-key"
+    assert captured["headers"]["idempotency-key"] == event.id
+    assert captured["body"]["event_id"] == event.id
+    assert captured["body"]["event_type"] == "customer.created"
+    assert captured["body"]["payload"]["email"] == "grace@example.com"
+
+
+def test_failed_prismatic_delivery_can_be_retried(
+    client: TestClient, tenants, db_session: Session
+):
+    response = client.post(
+        "/customers",
+        headers=auth(tenants[0]["key"]),
+        json={"name": "Retry Buyer", "email": "retry@example.com"},
+    )
+    event = db_session.scalar(
+        select(IntegrationEvent).where(IntegrationEvent.entity_id == response.json()["id"])
+    )
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(503, text="temporarily unavailable")
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as webhook_client:
+        delivered = dispatch_event(
+            db_session,
+            event,
+            client=webhook_client,
+            webhook_url="https://hooks.prismatic.io/trigger/test",
+            api_key="test-prismatic-key",
+            max_attempts=1,
+        )
+
+    assert delivered is False
+    assert event.status == "failed"
+    assert event.retry_count == 1
+    assert event.last_error
+
+    retry = client.post(
+        f"/integration-events/{event.id}/retry", headers=auth(tenants[0]["key"])
+    )
+    assert retry.status_code == 200
+    assert retry.json()["status"] == "pending"
+    assert retry.json()["retry_count"] == 0
+    assert retry.json()["last_error"] is None
 
 
 def test_tenant_isolation(client: TestClient, tenants):
@@ -113,6 +195,12 @@ def test_odoo_webhook_processing(client: TestClient, catalog, db_session: Sessio
         "/webhooks/odoo",
         headers=auth(catalog["tenant"]["key"]),
         json={
+            "event_id": db_session.scalar(
+                select(IntegrationEvent.id).where(
+                    IntegrationEvent.entity_id == order_id,
+                    IntegrationEvent.event_type == "order.created",
+                )
+            ),
             "entity_type": "order",
             "entity_id": order_id,
             "external_id": "ODOO-SO-9001",
@@ -175,5 +263,3 @@ def test_seed_endpoint(client: TestClient):
     res = client.post("/seed")
     assert res.status_code == 200
     assert res.json()["status"] == "ok"
-
-

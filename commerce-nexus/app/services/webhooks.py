@@ -40,17 +40,19 @@ def process_odoo_webhook(db: Session, tenant_id: str, data: OdooWebhook):
 
     db.flush()
     completed_at = datetime.now(UTC)
-    source_event = db.scalar(
-        select(IntegrationEvent)
-        .where(
-            IntegrationEvent.tenant_id == tenant_id,
-            IntegrationEvent.entity_type == data.entity_type,
-            IntegrationEvent.entity_id == entity.id,
-            IntegrationEvent.status == "pending",
-        )
-        .order_by(IntegrationEvent.created_at.desc(), IntegrationEvent.id.desc())
-        .limit(1)
+    source_event_query = select(IntegrationEvent).where(
+        IntegrationEvent.tenant_id == tenant_id,
+        IntegrationEvent.entity_type == data.entity_type,
+        IntegrationEvent.entity_id == entity.id,
+        IntegrationEvent.status.in_(("pending", "dispatched")),
     )
+    if data.event_id:
+        source_event_query = source_event_query.where(IntegrationEvent.id == data.event_id)
+    else:
+        source_event_query = source_event_query.order_by(
+            IntegrationEvent.created_at.desc(), IntegrationEvent.id.desc()
+        ).limit(1)
+    source_event = db.scalar(source_event_query)
     if source_event:
         source_event.status = "failed" if entity.sync_status == "failed" else "processed"
         source_event.processed_at = completed_at
@@ -76,6 +78,9 @@ def retry_event(db: Session, tenant_id: str, event_id: str) -> IntegrationEvent:
     if event is None:
         raise NotFoundError("Integration event", event_id)
     event.status = "pending"
-    event.retry_count += 1
+    event.retry_count = 0
     event.processed_at = None
+    event.last_attempted_at = None
+    event.next_attempt_at = None
+    event.last_error = None
     return event

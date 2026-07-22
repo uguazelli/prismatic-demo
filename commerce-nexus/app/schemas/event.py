@@ -15,3 +15,6 @@ class IntegrationEventRead(ApiSchema):
     retry_count: int
     created_at: datetime
     processed_at: datetime | None
+    last_attempted_at: datetime | None
+    next_attempt_at: datetime | None
+    last_error: str | None

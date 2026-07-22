@@ -1,3 +1,5 @@
+import asyncio
+from contextlib import asynccontextmanager
 import logging
 from pathlib import Path
 import time
@@ -24,8 +26,6 @@ logger = logging.getLogger("app.requests")
 STATIC_DIR = Path(__file__).parent / "frontend" / "static"
 
 
-from contextlib import asynccontextmanager
-
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     try:
@@ -39,7 +39,35 @@ async def lifespan(application: FastAPI):
                 seed_db()
     except Exception as e:
         logger.warning(f"Auto-seed check warning: {e}")
-    yield
+
+    dispatcher_task = None
+    stop_dispatcher = asyncio.Event()
+    if settings.prismatic_webhook_url and settings.prismatic_api_key:
+        from app.events.dispatcher import dispatch_pending_events
+
+        async def run_dispatcher() -> None:
+            while not stop_dispatcher.is_set():
+                try:
+                    await asyncio.to_thread(dispatch_pending_events)
+                except Exception:
+                    logger.exception("prismatic_dispatcher_failed")
+                try:
+                    await asyncio.wait_for(
+                        stop_dispatcher.wait(),
+                        timeout=settings.prismatic_dispatch_interval_seconds,
+                    )
+                except TimeoutError:
+                    pass
+
+        dispatcher_task = asyncio.create_task(run_dispatcher())
+        logger.info("prismatic_dispatcher_started")
+
+    try:
+        yield
+    finally:
+        if dispatcher_task:
+            stop_dispatcher.set()
+            await dispatcher_task
 
 
 def create_app() -> FastAPI:
@@ -148,4 +176,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-

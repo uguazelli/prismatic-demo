@@ -284,6 +284,7 @@ const App = (function () {
   function getEventStatusBadge(status) {
     if (status === "processed" || status === "success") return "success";
     if (status === "pending") return "warning";
+    if (status === "dispatched") return "info";
     if (status === "failed") return "danger";
     return "neutral";
   }
@@ -757,7 +758,7 @@ const App = (function () {
   async function retryEvent(id) {
     try {
       const res = await apiFetch(`/integration-events/${id}/retry`, { method: "POST" });
-      showToast(`Event retried! Status is now '${res.data.status}' (Retry count: ${res.data.retry_count})`, "success");
+      showToast(`Event queued for delivery. Status is now '${res.data.status}'.`, "success");
       loadEvents();
     } catch (err) {
       showToast("Error retrying event: " + err.message, "error");

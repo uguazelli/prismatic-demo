@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,6 +11,12 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://demo:demo@postgres:5432/demo_saas"
     admin_api_key: str = "change-me-admin-key"
     cors_origins: str = "*"
+    prismatic_webhook_url: str | None = None
+    prismatic_api_key: SecretStr | None = None
+    prismatic_dispatch_interval_seconds: float = 2.0
+    prismatic_dispatch_batch_size: int = 25
+    prismatic_dispatch_max_attempts: int = 5
+    prismatic_webhook_timeout_seconds: float = 10.0
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

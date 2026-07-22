@@ -4,6 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.config import settings
 from app.database import get_db
 from app.main import app
 from app.models import Base
@@ -29,10 +30,18 @@ def client(db_session: Session):
     def override_get_db():
         yield db_session
 
+    original_webhook_url = settings.prismatic_webhook_url
+    original_api_key = settings.prismatic_api_key
+    settings.prismatic_webhook_url = None
+    settings.prismatic_api_key = None
     app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as test_client:
-        yield test_client
-    app.dependency_overrides.clear()
+    try:
+        with TestClient(app) as test_client:
+            yield test_client
+    finally:
+        app.dependency_overrides.clear()
+        settings.prismatic_webhook_url = original_webhook_url
+        settings.prismatic_api_key = original_api_key
 
 
 @pytest.fixture()
