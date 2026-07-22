@@ -1,8 +1,30 @@
+# Local secrets and environment overrides
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python
 .venv/
 __pycache__/
+*.py[cod]
 .pytest_cache/
 .coverage
 htmlcov/
-*.py[cod]
 *.db
+
+# Node.js / Prismatic builds
+node_modules/
+dist/
+coverage/
+.npm/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.swp
+
+# Operating system files
+.DS_Store
+Thumbs.db

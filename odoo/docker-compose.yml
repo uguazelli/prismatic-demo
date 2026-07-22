@@ -1,0 +1,47 @@
+services:
+  web:
+    image: odoo:latest
+    container_name: odoo_web
+    ports:
+      - "8069:8069"
+      - "8072:8072"
+    environment:
+      - HOST=db
+      - USER=odoo
+      - PASSWORD=odoo
+    volumes:
+      - odoo-web-data:/var/lib/odoo
+      - ./config:/etc/odoo
+      - ./addons:/mnt/extra-addons
+    networks:
+      veridata.network:
+        aliases:
+          - veridata.odoo.demo
+    depends_on:
+      - db
+    restart: always
+
+  db:
+    image: postgres:16
+    container_name: odoo_db
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_PASSWORD=odoo
+      - POSTGRES_USER=odoo
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - odoo-db-data:/var/lib/postgresql/data/pgdata
+    networks:
+      - veridata.network
+    restart: always
+
+volumes:
+  odoo-web-data:
+  odoo-db-data:
+
+networks:
+  veridata.network:
+    name: veridata.network
+    # Set external: true if veridata.network is created outside of this compose file
+    # Run: 'docker network create veridata.network' before starting if external: true is used
+    external: true
