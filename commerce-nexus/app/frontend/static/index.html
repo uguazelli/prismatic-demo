@@ -104,6 +104,10 @@
             <p>Veridata Commerce Nexus syncs customers, products, and order state with Odoo ERP via Prismatic integration flows using asynchronous IntegrationEvents and webhook callbacks.</p>
           </div>
           <div class="hero-actions">
+            <button id="btn-connect-odoo" class="btn btn-odoo" onclick="App.connectOdoo()">
+              <span class="odoo-button-mark" aria-hidden="true">O</span>
+              <span id="connect-odoo-label">Connect Odoo</span>
+            </button>
             <button class="btn btn-primary" onclick="App.openCreateOrderModal()">+ Quick Create Order</button>
             <button class="btn btn-secondary" onclick="App.switchTab('webhooks')">Simulate Odoo Webhook</button>
           </div>
@@ -714,6 +718,8 @@
   <!-- Toast Notification Container -->
   <div id="toast-container" class="toast-container"></div>
 
+  <!-- Prismatic Embedded SDK (pinned browser bundle for this static demo UI) -->
+  <script src="https://unpkg.com/@prismatic-io/embedded@4.12.1/dist/index.umd.js"></script>
   <!-- Main JavaScript App Entry -->
   <script src="/static/js/app.js"></script>
 </body>

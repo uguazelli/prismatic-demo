@@ -14,6 +14,11 @@ services:
       ADMIN_API_KEY: ${ADMIN_API_KEY:-change-me-admin-key}
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
       PRISMATIC_ORGANIZATION_ID: ${PRISMATIC_ORGANIZATION_ID:-T3JnYW5pemF0aW9uOmUyZDdiNTY5LWViN2ItNDAyYy04ZTYyLWRiOTQxMTE0OWI3Yg==}
+      PRISMATIC_URL: ${PRISMATIC_URL:-https://app.prismatic.io}
+      PRISMATIC_INTEGRATION_NAME: ${PRISMATIC_INTEGRATION_NAME:-Veridata Commerce Nexus - Odoo}
+      PRISMATIC_EMBEDDED_SIGNING_KEY_BASE64: ${PRISMATIC_EMBEDDED_SIGNING_KEY_BASE64:-}
+      PRISMATIC_EMBEDDED_SIGNING_KEY_FILE: /run/secrets/prismatic-embedded-private-key.pem
+      PRISMATIC_EMBEDDED_TOKEN_TTL_SECONDS: ${PRISMATIC_EMBEDDED_TOKEN_TTL_SECONDS:-3600}
       PRISMATIC_WEBHOOK_URL: ${PRISMATIC_WEBHOOK_URL:-}
       PRISMATIC_API_KEY: ${PRISMATIC_API_KEY:-}
       PRISMATIC_DISPATCH_INTERVAL_SECONDS: ${PRISMATIC_DISPATCH_INTERVAL_SECONDS:-2}
@@ -32,6 +37,7 @@ services:
     volumes:
       - ./app:/app/app
       - ./alembic:/app/alembic
+      - ./.secrets:/run/secrets:ro
     networks:
       veridata.network:
         aliases:

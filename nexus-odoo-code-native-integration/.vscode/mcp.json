@@ -1,0 +1,12 @@
+{
+  "servers": {
+    "prism": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@prismatic-io/prism-mcp", "."],
+      "env": {
+        "PRISMATIC_URL": "https://app.prismatic.io"
+      }
+    }
+  }
+}

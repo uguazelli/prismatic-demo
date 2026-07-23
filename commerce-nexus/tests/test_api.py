@@ -1,10 +1,15 @@
 import json
 
 import httpx
+import jwt
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.models import Customer, IntegrationEvent, Order
 from app.events.dispatcher import dispatch_event
 from tests.conftest import auth
@@ -249,6 +254,8 @@ def test_frontend_index_and_static_files(client: TestClient):
     assert index_res.status_code == 200
     assert "Veridata Commerce Nexus" in index_res.text
     assert "<title>Veridata Commerce Nexus" in index_res.text
+    assert 'id="btn-connect-odoo"' in index_res.text
+    assert "@prismatic-io/embedded@4.12.1" in index_res.text
 
     css_res = client.get("/static/css/styles.css")
     assert css_res.status_code == 200
@@ -257,6 +264,67 @@ def test_frontend_index_and_static_files(client: TestClient):
     js_res = client.get("/static/js/app.js")
     assert js_res.status_code == 200
     assert "const App =" in js_res.text
+    assert "prismatic.configureInstance" in js_res.text
+
+
+def test_prismatic_embedded_token_is_tenant_scoped(client: TestClient, tenants):
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    private_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    ).decode("utf-8")
+    original_key = settings.prismatic_embedded_signing_key
+    original_base64_key = settings.prismatic_embedded_signing_key_base64
+    original_key_file = settings.prismatic_embedded_signing_key_file
+    settings.prismatic_embedded_signing_key = SecretStr(private_pem)
+    settings.prismatic_embedded_signing_key_base64 = None
+    settings.prismatic_embedded_signing_key_file = None
+
+    try:
+        response = client.post(
+            "/integrations/prismatic/embedded-token",
+            headers=auth(tenants[0]["key"]),
+        )
+    finally:
+        settings.prismatic_embedded_signing_key = original_key
+        settings.prismatic_embedded_signing_key_base64 = original_base64_key
+        settings.prismatic_embedded_signing_key_file = original_key_file
+
+    assert response.status_code == 200
+    body = response.json()
+    claims = jwt.decode(
+        body["token"],
+        private_key.public_key(),
+        algorithms=["RS256"],
+    )
+    assert claims["organization"] == settings.prismatic_organization_id
+    assert claims["customer"] == tenants[0]["id"]
+    assert claims["customer"] != tenants[1]["id"]
+    assert claims["role"] == "admin"
+    assert body["integration_name"] == "Veridata Commerce Nexus - Odoo"
+
+
+def test_prismatic_embedded_token_requires_server_signing_key(client: TestClient, tenants):
+    original_key = settings.prismatic_embedded_signing_key
+    original_base64_key = settings.prismatic_embedded_signing_key_base64
+    original_key_file = settings.prismatic_embedded_signing_key_file
+    settings.prismatic_embedded_signing_key = None
+    settings.prismatic_embedded_signing_key_base64 = None
+    settings.prismatic_embedded_signing_key_file = None
+
+    try:
+        response = client.post(
+            "/integrations/prismatic/embedded-token",
+            headers=auth(tenants[0]["key"]),
+        )
+    finally:
+        settings.prismatic_embedded_signing_key = original_key
+        settings.prismatic_embedded_signing_key_base64 = original_base64_key
+        settings.prismatic_embedded_signing_key_file = original_key_file
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "prismatic_embedded_not_configured"
 
 
 def test_seed_endpoint(client: TestClient):

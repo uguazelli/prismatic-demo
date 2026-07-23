@@ -14,6 +14,7 @@ Veridata Commerce Nexus is a production-style, multi-tenant B2B order-management
 - Transactional integration-event creation for every business create/update
 - Structured JSON request logs, request IDs, paginated/filterable lists, and consistent error envelopes
 - OpenAPI at `/docs`, ReDoc at `/redoc`, and the schema at `/openapi.json`
+- A client-facing **Connect Odoo** action that opens the tenant-scoped Prismatic configuration wizard
 
 The order model also stores `invoice_status`, `payment_status`, and `delivery_status`. These are callback fields needed for the Odoo demonstration in addition to the requested core order fields.
 
@@ -72,6 +73,33 @@ It creates two tenants, five customers and ten products per tenant, and three sa
 - Globex Wholesale: `demo-globex-api-key`
 
 These keys are intentionally public demo credentials. Replace them outside a local demonstration. Tenant provisioning returns the raw generated/supplied API key exactly once; only its hash is stored.
+
+## Enable the client-facing Connect Odoo button
+
+The dashboard's **Connect Odoo** button opens the published `Veridata Commerce Nexus - Odoo` integration directly in Prismatic's embedded configuration wizard. Commerce Nexus signs a short-lived, tenant-scoped JWT on the backend; the RSA private key is never sent to the browser.
+
+Before using the button:
+
+1. Publish `Veridata Commerce Nexus - Odoo` and make that published version available in the Prismatic marketplace.
+2. Generate a private/public RSA key pair locally and import only the public key into Prismatic:
+
+   ```bash
+   mkdir -p .secrets
+   openssl genrsa -out .secrets/prismatic-embedded-private-key.pem 4096
+   chmod 600 .secrets/prismatic-embedded-private-key.pem
+   openssl rsa -in .secrets/prismatic-embedded-private-key.pem \
+     -pubout -out /tmp/prismatic-embedded-public-key.pem
+   prism organization:signing-keys:import \
+     --public-key-file /tmp/prismatic-embedded-public-key.pem
+   ```
+
+   The private PEM is ignored by Git and mounted read-only at runtime. You can alternatively provide a single-line Base64 value through `PRISMATIC_EMBEDDED_SIGNING_KEY_BASE64`.
+
+3. Restart `demo-saas-api` so it loads the signing key.
+
+When a client clicks the button, `POST /integrations/prismatic/embedded-token` verifies their existing tenant `X-API-Key`, creates or reuses the corresponding Prismatic customer, authenticates a customer administrator, and opens the Odoo configuration wizard in a popover. After activation, the dashboard changes the action to **Manage Odoo** for that tenant.
+
+The default static demo loads the pinned Prismatic browser bundle from unpkg. For a production deployment, install `@prismatic-io/embedded` through your frontend build and self-host the compiled asset.
 
 To reset all local PostgreSQL data (destructive):
 

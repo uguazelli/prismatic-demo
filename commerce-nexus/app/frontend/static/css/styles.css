@@ -621,6 +621,41 @@ body {
   background: var(--primary-hover);
 }
 
+.btn-odoo {
+  background: linear-gradient(135deg, #714b67, #9b5c8f);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 6px 18px rgba(113, 75, 103, 0.35);
+}
+
+.btn-odoo:hover {
+  background: linear-gradient(135deg, #805774, #ac6b9f);
+  transform: translateY(-1px);
+}
+
+.btn-odoo.connected {
+  background: linear-gradient(135deg, #047857, #10b981);
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.28);
+}
+
+.btn-odoo:disabled {
+  cursor: wait;
+  opacity: 0.72;
+  transform: none;
+}
+
+.odoo-button-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 0.35rem;
+  background: rgba(255, 255, 255, 0.18);
+  font-weight: 700;
+  line-height: 1;
+}
+
 .btn-secondary {
   background: var(--bg-surface-elevated);
   color: var(--text-main);
@@ -1043,4 +1078,3 @@ body {
   border-color: var(--primary);
   background: rgba(99, 102, 241, 0.1);
 }
-

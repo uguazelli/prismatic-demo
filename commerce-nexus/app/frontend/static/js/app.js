@@ -17,6 +17,8 @@ const App = (function () {
     cachedProducts: [],
     orderWizardItems: [],
     sandboxKey: "",
+    prismaticInitialized: false,
+    prismaticOrigin: null,
   };
 
   // API Wrapper
@@ -107,6 +109,8 @@ const App = (function () {
     applyTheme(state.theme);
     setupTenantSelector();
     setupNavigation();
+    setupPrismaticEvents();
+    updateOdooButton();
     checkHealth();
     generateNewSandboxKey();
     switchTab("overview");
@@ -160,8 +164,97 @@ const App = (function () {
     state.apiKey = key;
     localStorage.setItem("veridata_api_key", key);
     document.getElementById("active-key-display").textContent = key;
+    updateOdooButton();
     showToast(`Switched active API key: ${key.substring(0, 12)}...`, "info");
     refreshCurrentTab();
+  }
+
+  // Embedded Prismatic Odoo configuration
+  function odooConnectionStorageKey() {
+    return `veridata_odoo_connected:${state.apiKey}`;
+  }
+
+  function updateOdooButton(isLoading = false) {
+    const button = document.getElementById("btn-connect-odoo");
+    const label = document.getElementById("connect-odoo-label");
+    if (!button || !label) return;
+
+    const connected = localStorage.getItem(odooConnectionStorageKey()) === "true";
+    button.disabled = isLoading;
+    button.classList.toggle("connected", connected);
+    label.textContent = isLoading
+      ? "Opening Odoo..."
+      : connected
+        ? "Manage Odoo"
+        : "Connect Odoo";
+  }
+
+  function setupPrismaticEvents() {
+    window.addEventListener("message", (message) => {
+      if (state.prismaticOrigin && message.origin !== state.prismaticOrigin) return;
+
+      const eventName = message.data?.event;
+      if (eventName === "INSTANCE_DEPLOYED") {
+        localStorage.setItem(odooConnectionStorageKey(), "true");
+        updateOdooButton();
+        showToast("Odoo is connected and the integration is active.", "success");
+      } else if (eventName === "INSTANCE_DELETED") {
+        localStorage.removeItem(odooConnectionStorageKey());
+        updateOdooButton();
+        showToast("The Odoo integration was disconnected.", "info");
+      } else if (
+        eventName === "INSTANCE_CONFIGURATION_CLOSED" ||
+        eventName === "POPOVER_CLOSED"
+      ) {
+        updateOdooButton();
+      }
+    });
+  }
+
+  async function connectOdoo() {
+    if (!window.prismatic) {
+      showToast("The Prismatic configuration client could not be loaded.", "error");
+      return;
+    }
+
+    updateOdooButton(true);
+    try {
+      const response = await apiFetch("/integrations/prismatic/embedded-token", {
+        method: "POST",
+      });
+      const config = response.data;
+      state.prismaticOrigin = new URL(config.prismatic_url).origin;
+
+      if (!state.prismaticInitialized) {
+        window.prismatic.init({
+          prismaticUrl: config.prismatic_url,
+          screenConfiguration: {
+            instance: {
+              hideBackToMarketplace: true,
+              hideTabs: ["Test", "Executions", "Monitors", "Logs"],
+            },
+            configurationWizard: {
+              mode: "streamlined",
+              connectionConfiguration: "inline",
+              triggerDetailsConfiguration: "default-open",
+            },
+          },
+        });
+        state.prismaticInitialized = true;
+      }
+
+      await window.prismatic.authenticate({ token: config.token });
+      window.prismatic.configureInstance({
+        integrationName: config.integration_name,
+        skipRedirectOnRemove: true,
+        usePopover: true,
+        theme: state.theme === "light" ? "LIGHT" : "DARK",
+      });
+    } catch (err) {
+      console.error("Unable to open Odoo configuration:", err);
+      showToast(`Unable to open Odoo configuration: ${err.message}`, "error");
+      updateOdooButton();
+    }
   }
 
   // Navigation
@@ -948,6 +1041,7 @@ const App = (function () {
     toggleTheme,
     seedDatabase,
     promptApiKey,
+    connectOdoo,
     refreshOverview,
     loadCustomers,
     openCustomerModal,
