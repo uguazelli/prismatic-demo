@@ -4,6 +4,7 @@
 
 import { flow } from "@prismatic-io/spectral";
 import odooActions from "./manifests/odoo/actions";
+import { syncNexusCustomerToOdoo } from "./nexusCustomerSync";
 
 const DEFAULT_ODOO_MODEL = "res.partner";
 
@@ -49,4 +50,4 @@ export const listOdooRecords = flow({
   },
 });
 
-export default [listOdooRecords];
+export default [listOdooRecords, syncNexusCustomerToOdoo];

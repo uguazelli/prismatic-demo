@@ -12,10 +12,12 @@
     "format": "biome format --write ."
   },
   "dependencies": {
-    "@prismatic-io/spectral": "10.23.0"
+    "@prismatic-io/spectral": "10.23.0",
+    "axios": "1.18.1"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.1",
+    "@types/node": "26.1.1",
     "dotenv": "^17.2.2",
     "tsdown": "0.22.3",
     "typescript": "6.0.3",
