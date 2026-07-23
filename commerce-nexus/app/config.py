@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://demo:demo@postgres:5432/demo_saas"
     admin_api_key: str = "change-me-admin-key"
     cors_origins: str = "*"
+    prismatic_organization_id: str | None = "T3JnYW5pemF0aW9uOmUyZDdiNTY5LWViN2ItNDAyYy04ZTYyLWRiOTQxMTE0OWI3Yg=="
     prismatic_webhook_url: str | None = None
     prismatic_api_key: SecretStr | None = None
     prismatic_dispatch_interval_seconds: float = 2.0

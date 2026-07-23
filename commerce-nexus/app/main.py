@@ -153,8 +153,11 @@ def create_app() -> FastAPI:
         )
 
     @application.get("/health", tags=["system"])
-    def health() -> dict[str, str]:
-        return {"status": "ok"}
+    def health() -> dict[str, str | None]:
+        return {
+            "status": "ok",
+            "prismatic_organization_id": settings.prismatic_organization_id,
+        }
 
     @application.post("/seed", tags=["system"])
     def seed_data(db: DbSession) -> dict[str, str]:
