@@ -1,3 +1,5 @@
+name: prismatic-demo
+
 services:
   demo-saas-api:
     build: .
