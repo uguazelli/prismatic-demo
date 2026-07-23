@@ -1,0 +1,4 @@
+interface:
+  display_name: "Build Prismatic Integration"
+  short_description: "Build and validate Prismatic CNI projects"
+  default_prompt: "Use $prismatic-build-integration to create a new Prismatic Code Native Integration."

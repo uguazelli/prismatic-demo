@@ -1,0 +1,19 @@
+{
+  "name": "prismatic-codex-skill-runtime",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prism:login": "prism login --force",
+    "prism:me": "prism me",
+    "tools:list": "tsx scripts/run.ts --list"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@prismatic-io/prism": "10.0.1",
+    "@xmldom/xmldom": "0.8.13",
+    "tsx": "4.22.4"
+  }
+}

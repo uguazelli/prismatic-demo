@@ -1,0 +1,13 @@
+{
+  "version": "1.0",
+  "flows": {
+    "de2361bd-6d44-47f8-b733-564bf3851b0c": {
+      "name": "List Odoo Records",
+      "triggerType": "webhook",
+      "webhook": {
+        "expectsPayload": true,
+        "contentType": "application/json"
+      }
+    }
+  }
+}
