@@ -6,6 +6,7 @@ from app.models.entities import (
     Order,
     OrderItem,
     Product,
+    SystemSetting,
     Tenant,
     TenantApiKey,
 )
@@ -18,6 +19,7 @@ __all__ = [
     "Order",
     "OrderItem",
     "Product",
+    "SystemSetting",
     "Tenant",
     "TenantApiKey",
 ]

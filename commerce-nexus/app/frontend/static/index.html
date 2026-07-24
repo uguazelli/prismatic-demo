@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/styles.css">
+  <link rel="stylesheet" href="/static/css/styles.css?v=1.4">
 </head>
 <body>
   <div id="app" class="app-container">
@@ -80,16 +80,10 @@
           <span class="tab-icon">🛒</span> Orders
         </button>
         <button class="nav-tab" data-tab="events">
-          <span class="tab-icon">⚡</span> Integration Events
+          <span class="tab-icon">⚡</span> Integration Hub
         </button>
-        <button class="nav-tab" data-tab="webhooks">
-          <span class="tab-icon">🔄</span> Odoo Webhook Simulator
-        </button>
-        <button class="nav-tab" data-tab="admin">
-          <span class="tab-icon">🏢</span> Tenant Admin
-        </button>
-        <button class="nav-tab" data-tab="idempotency">
-          <span class="tab-icon">🧪</span> Idempotency Sandbox
+        <button class="nav-tab" data-tab="settings">
+          <span class="tab-icon">⚙️</span> Settings &amp; Admin
         </button>
       </div>
     </nav>
@@ -109,7 +103,7 @@
               <span id="connect-odoo-label">Connect Odoo</span>
             </button>
             <button class="btn btn-primary" onclick="App.openCreateOrderModal()">+ Quick Create Order</button>
-            <button class="btn btn-secondary" onclick="App.switchTab('webhooks')">Simulate Odoo Webhook</button>
+            <button class="btn btn-secondary" onclick="App.switchTab('events')">View Integration Hub</button>
           </div>
         </div>
 
@@ -332,7 +326,7 @@
         </div>
       </section>
 
-      <!-- 5. INTEGRATION EVENTS TAB -->
+      <!-- 5. INTEGRATION HUB (EVENTS & WEBHOOKS) -->
       <section id="tab-events" class="tab-panel">
         <div class="table-toolbar">
           <div class="filter-group">
@@ -356,7 +350,7 @@
           <button class="btn btn-secondary" onclick="App.loadEvents()">🔄 Refresh Log</button>
         </div>
 
-        <div class="glass-card table-card">
+        <div class="glass-card table-card" style="margin-bottom: 2rem;">
           <table class="data-table">
             <thead>
               <tr>
@@ -376,10 +370,8 @@
           </table>
           <div class="table-footer" id="events-pagination"></div>
         </div>
-      </section>
 
-      <!-- 6. ODOO WEBHOOK SIMULATOR TAB -->
-      <section id="tab-webhooks" class="tab-panel">
+        <!-- Inbound Odoo Webhook Receiver Simulator -->
         <div class="glass-card simulator-card">
           <div class="card-header">
             <h3>Prismatic -&gt; SaaS Odoo Webhook Receiver Simulator</h3>
@@ -460,70 +452,109 @@
         </div>
       </section>
 
-      <!-- 7. TENANT ADMIN TAB -->
-      <section id="tab-admin" class="tab-panel">
-        <div class="table-toolbar">
-          <div class="admin-key-bar">
-            <span>Admin Key Mode:</span>
-            <input type="text" id="admin-key-input" class="text-input sm" value="change-me-admin-key" placeholder="Enter Admin API Key">
-            <button class="btn btn-secondary btn-sm" onclick="App.loadTenants()">Verify &amp; Load Tenants</button>
+      <!-- 6. UNIFIED SETTINGS & ADMIN TAB -->
+      <section id="tab-settings" class="tab-panel">
+        <div class="settings-section">
+
+          <!-- Card 1: Prismatic Integration Settings -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <h3>⚡ Prismatic Integration Configuration</h3>
+              <button class="btn btn-primary btn-sm" onclick="App.savePrismaticSettings()">💾 Save Integration Settings</button>
+            </div>
+            <p class="sim-intro" style="margin-bottom: 1rem;">Configure the Prismatic Organization ID, Webhook Flow URL, and integration metadata. These settings persist across server restarts.</p>
+            
+            <div class="settings-form-grid">
+              <div class="form-group">
+                <label>Prismatic Organization ID</label>
+                <input type="text" id="prismatic-org-id-input" class="text-input mono" placeholder="e.g. T3JnYW5pemF0aW9uOmUyZDdi...">
+                <small class="help-text">Organization ID used to sign tenant-scoped embedded JWT tokens.</small>
+              </div>
+
+              <div class="form-group">
+                <label>Prismatic Webhook Flow URL</label>
+                <input type="text" id="prismatic-webhook-url-input" class="text-input mono" placeholder="https://hooks.prismatic.io/trigger/...">
+                <small class="help-text">Target flow trigger endpoint for customer/product/order events.</small>
+              </div>
+
+              <div class="form-group">
+                <label>Prismatic Integration Name</label>
+                <input type="text" id="prismatic-name-input" class="text-input" placeholder="Veridata Commerce Nexus - Odoo">
+                <small class="help-text">Name of the integration published in the Prismatic marketplace.</small>
+              </div>
+
+              <div class="form-group">
+                <label>Prismatic Base URL</label>
+                <input type="text" id="prismatic-url-input" class="text-input" placeholder="https://app.prismatic.io">
+                <small class="help-text">Prismatic web platform base URL.</small>
+              </div>
+            </div>
           </div>
-          <button class="btn btn-primary" onclick="App.openCreateTenantModal()">+ Create Tenant</button>
-        </div>
 
-        <div class="glass-card table-card">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Tenant ID</th>
-                <th>Tenant Name</th>
-                <th>External Odoo Instance ID</th>
-                <th>Created At</th>
-              </tr>
-            </thead>
-            <tbody id="tenants-table-body">
-              <tr><td colspan="4" class="text-center">Enter admin key and click "Verify &amp; Load Tenants".</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- 8. IDEMPOTENCY SANDBOX TAB -->
-      <section id="tab-idempotency" class="tab-panel">
-        <div class="glass-card sandbox-card">
-          <div class="card-header">
-            <h3>Idempotency-Key Header Demonstration</h3>
-            <span class="badge badge-warning">HTTP Header Validation</span>
-          </div>
-          <p class="sim-intro">Test the API's duplicate prevention mechanism. When a request includes an <code>Idempotency-Key</code>, re-submitting the exact same key will return the cached response without creating duplicate database records or raising duplicate event triggers.</p>
-
-          <div class="sandbox-controls">
-            <div class="form-group">
-              <label>Idempotency Key Header:</label>
-              <div class="input-with-button">
-                <input type="text" id="sandbox-key" class="text-input" readonly>
-                <button class="btn btn-secondary" onclick="App.generateNewSandboxKey()">🔄 New Random Key</button>
+          <!-- Card 2: Tenant Administration -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <h3>🏢 Tenant Administration &amp; Provisioning</h3>
+              <button class="btn btn-primary btn-sm" onclick="App.openCreateTenantModal()">+ Create New Tenant</button>
+            </div>
+            
+            <div class="table-toolbar" style="margin-bottom: 1rem;">
+              <div class="admin-key-bar">
+                <span>System Admin Secret Key:</span>
+                <input type="text" id="admin-key-input" class="text-input sm" value="change-me-admin-key" placeholder="Enter Admin API Key">
+                <button class="btn btn-secondary btn-sm" onclick="App.loadTenants()">Verify &amp; Load Tenants</button>
               </div>
             </div>
 
-            <div class="sandbox-actions">
-              <button class="btn btn-primary" onclick="App.testIdempotencyRequest(1)">Submit First Request (Creates Entity)</button>
-              <button class="btn btn-warning" onclick="App.testIdempotencyRequest(2)">Submit Duplicate Request (Returns Cached Result)</button>
+            <div class="glass-card table-card">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Tenant ID</th>
+                    <th>Tenant Name</th>
+                    <th>External Odoo Instance ID</th>
+                    <th>Created At</th>
+                  </tr>
+                </thead>
+                <tbody id="tenants-table-body">
+                  <tr><td colspan="4" class="text-center">Enter admin key and click "Verify &amp; Load Tenants".</td></tr>
+                </tbody>
+              </table>
             </div>
           </div>
 
-          <div class="sandbox-output-grid">
-            <div class="output-box">
-              <h4>Response 1 (Initial Request)</h4>
-              <div class="status-code" id="sandbox-status-1">-</div>
-              <pre><code id="sandbox-code-1">// Click "Submit First Request"</code></pre>
+          <!-- Card 3: Idempotency Sandbox -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <h3>🧪 Developer Idempotency Sandbox</h3>
+              <span class="badge badge-warning">HTTP Header Validation</span>
             </div>
-            <div class="output-box">
-              <h4>Response 2 (Duplicate Idempotency Key)</h4>
-              <div class="status-code" id="sandbox-status-2">-</div>
-              <pre><code id="sandbox-code-2">// Click "Submit Duplicate Request"</code></pre>
+            <p class="sim-intro">Test the API's duplicate prevention mechanism. When a request includes an <code>Idempotency-Key</code>, re-submitting the exact same key will return the cached response without creating duplicate database records or raising duplicate event triggers.</p>
+
+            <div class="sandbox-controls">
+              <div class="form-group">
+                <label>Idempotency Key Header:</label>
+                <div class="input-with-button">
+                  <input type="text" id="sandbox-key" class="text-input" readonly>
+                  <button class="btn btn-secondary" onclick="App.generateNewSandboxKey()">🔄 New Random Key</button>
+                </div>
+              </div>
+
+              <div class="sandbox-actions">
+                <button class="btn btn-primary" onclick="App.testIdempotencyRequest(1)">Submit First Request (Creates Entity)</button>
+                <button class="btn btn-secondary" onclick="App.testIdempotencyRequest(2)">Re-submit Same Key (Cached Response)</button>
+              </div>
+            </div>
+
+            <div class="output-box hidden" id="sandbox-output-box">
+              <div class="output-header">
+                <span id="sandbox-status-badge" class="badge"></span>
+                <span id="sandbox-cached-flag" class="mono text-dim"></span>
+              </div>
+              <pre><code id="sandbox-output-code"></code></pre>
             </div>
           </div>
+
         </div>
       </section>
     </main>
@@ -545,6 +576,13 @@
       </div>
       <form id="form-customer" onsubmit="App.saveCustomer(event)">
         <input type="hidden" id="cust-id">
+        <div class="form-group" id="cust-id-container" style="display: none;">
+          <label>Customer ID (UUID)</label>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <input type="text" id="cust-id-display" class="text-input mono" readonly style="font-size: 0.85rem;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="App.copyToClipboard(document.getElementById('cust-id-display').value, 'Customer ID')">📋 Copy</button>
+          </div>
+        </div>
         <div class="form-group">
           <label>Customer Name</label>
           <input type="text" id="cust-name" class="text-input" required placeholder="e.g. Apex Industrial Supplies">
@@ -721,6 +759,6 @@
   <!-- Prismatic Embedded SDK (pinned browser bundle for this static demo UI) -->
   <script src="https://unpkg.com/@prismatic-io/embedded@4.12.1/dist/index.umd.js"></script>
   <!-- Main JavaScript App Entry -->
-  <script src="/static/js/app.js"></script>
+  <script src="/static/js/app.js?v=1.4"></script>
 </body>
 </html>

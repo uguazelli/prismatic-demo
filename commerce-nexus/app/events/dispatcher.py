@@ -11,6 +11,9 @@ from app.database import SessionLocal
 from app.models import IntegrationEvent
 
 
+from app.services.system_settings import get_prismatic_webhook_url
+
+
 logger = logging.getLogger("app.prismatic")
 CUSTOMER_EVENT_TYPES = ("customer.created", "customer.updated")
 
@@ -37,7 +40,7 @@ def dispatch_event(
     max_attempts: int | None = None,
 ) -> bool:
     """Attempt one Prismatic delivery and persist the outcome."""
-    webhook_url = webhook_url or settings.prismatic_webhook_url
+    webhook_url = webhook_url or get_prismatic_webhook_url(db)
     configured_key = settings.prismatic_api_key
     api_key = api_key or (configured_key.get_secret_value() if configured_key else None)
     max_attempts = max_attempts or settings.prismatic_dispatch_max_attempts

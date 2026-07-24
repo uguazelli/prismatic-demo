@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     cors_origins: str = "*"
     prismatic_organization_id: str | None = "T3JnYW5pemF0aW9uOmUyZDdiNTY5LWViN2ItNDAyYy04ZTYyLWRiOTQxMTE0OWI3Yg=="
     prismatic_url: str = "https://app.prismatic.io"
-    prismatic_integration_name: str = "Veridata Commerce Nexus - Odoo"
+    prismatic_integration_name: str = "Nexus Odoo"
     prismatic_embedded_signing_key: SecretStr | None = None
     prismatic_embedded_signing_key_base64: SecretStr | None = None
     prismatic_embedded_signing_key_file: str | None = ".secrets/prismatic-embedded-private-key.pem"

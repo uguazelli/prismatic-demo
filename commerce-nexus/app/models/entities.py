@@ -156,3 +156,13 @@ class IdempotencyRecord(Base):
     response_body: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     status_code: Mapped[int] = mapped_column(Integer, default=201)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class SystemSetting(Base):
+    __tablename__ = "system_settings"
+
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

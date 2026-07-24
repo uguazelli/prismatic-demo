@@ -89,6 +89,32 @@ const App = (function () {
     }, 4000);
   }
 
+  // Copy to Clipboard & Copyable ID Helper
+  async function copyToClipboard(text, label = "ID") {
+    if (!text) return;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      showToast(`Copied ${label} to clipboard!`, "success");
+    } catch (err) {
+      showToast(`Failed to copy: ${err.message}`, "error");
+    }
+  }
+
+  function renderCopyableId(id, label = "ID", len = 8) {
+    if (!id) return "-";
+    const display = id.length > len ? `${id.substring(0, len)}...` : id;
+    return `<span class="copyable-id" onclick="App.copyToClipboard('${id}', '${label}')" title="Click to copy full ID (${id})"><code class="mono">${display}</code> <span class="copy-icon">📋</span></span>`;
+  }
+
   // Health Check
   async function checkHealth() {
     const badge = document.getElementById("health-status-badge");
@@ -294,15 +320,11 @@ const App = (function () {
         break;
       case "events":
         loadEvents();
-        break;
-      case "webhooks":
         updateWebhookFormFields();
         break;
-      case "admin":
-        loadTenants();
-        break;
-      case "idempotency":
-        // sandbox tab ready
+      case "settings":
+        loadPrismaticSettings();
+        generateNewSandboxKey();
         break;
     }
   }
@@ -365,7 +387,7 @@ const App = (function () {
       <div class="activity-item">
         <div class="activity-info">
           <span class="activity-title">${ev.event_type} (${ev.entity_type})</span>
-          <span class="activity-meta">ID: ${ev.id.substring(0, 8)}... &bull; ${new Date(ev.created_at).toLocaleTimeString()}</span>
+          <span class="activity-meta">ID: ${renderCopyableId(ev.id, "Event ID")} &bull; ${new Date(ev.created_at).toLocaleTimeString()}</span>
         </div>
         <span class="badge badge-${getEventStatusBadge(ev.status)}">${ev.status}</span>
       </div>
@@ -414,11 +436,11 @@ const App = (function () {
       .map(
         (c) => `
       <tr>
-        <td class="mono">${c.id.substring(0, 8)}...</td>
+        <td>${renderCopyableId(c.id, "Customer ID")}</td>
         <td><strong>${escapeHtml(c.name)}</strong></td>
         <td>${escapeHtml(c.email)}</td>
         <td>${escapeHtml(c.phone || "-")}</td>
-        <td><code class="mono">${c.external_id || "<em>Unassigned</em>"}</code></td>
+        <td>${c.external_id ? renderCopyableId(c.external_id, "Odoo ID", 15) : '<code class="mono"><em>Unassigned</em></code>'}</td>
         <td><span class="badge badge-${getEventStatusBadge(c.sync_status)}">${c.sync_status}</span></td>
         <td>${new Date(c.updated_at).toLocaleDateString()}</td>
         <td>
@@ -439,6 +461,15 @@ const App = (function () {
     document.getElementById("cust-email").value = cust ? cust.email : "";
     document.getElementById("cust-phone").value = cust ? cust.phone || "" : "";
     document.getElementById("cust-external-id").value = cust ? cust.external_id || "" : "";
+
+    const idContainer = document.getElementById("cust-id-container");
+    const idDisplay = document.getElementById("cust-id-display");
+    if (cust && idContainer && idDisplay) {
+      idContainer.style.display = "block";
+      idDisplay.value = cust.id;
+    } else if (idContainer) {
+      idContainer.style.display = "none";
+    }
 
     document.getElementById("modal-customer-title").textContent = cust ? "Edit Customer" : "Add New Customer";
     document.getElementById("modal-customer").showModal();
@@ -604,8 +635,8 @@ const App = (function () {
       .map(
         (o) => `
       <tr>
-        <td class="mono">${o.id.substring(0, 8)}...</td>
-        <td>${o.customer_id ? `<span class="mono">${o.customer_id.substring(0, 8)}...</span>` : "-"}</td>
+        <td>${renderCopyableId(o.id, "Order ID")}</td>
+        <td>${o.customer_id ? renderCopyableId(o.customer_id, "Customer ID") : "-"}</td>
         <td><strong>$${parseFloat(o.total_amount).toFixed(2)}</strong></td>
         <td><span class="badge badge-${getOrderStatusBadge(o.status)}">${o.status}</span></td>
         <td><code class="mono">${o.external_id || "<em>Unassigned</em>"}</code></td>
@@ -789,7 +820,48 @@ const App = (function () {
     }
   }
 
-  // 5. INTEGRATION EVENTS TAB
+  // 5. INTEGRATION HUB & SETTINGS
+  async function loadPrismaticSettings() {
+    try {
+      const res = await apiFetch("/integrations/prismatic/settings");
+      if (res.data) {
+        const orgInput = document.getElementById("prismatic-org-id-input");
+        const urlInput = document.getElementById("prismatic-webhook-url-input");
+        const nameInput = document.getElementById("prismatic-name-input");
+        const appUrlInput = document.getElementById("prismatic-url-input");
+
+        if (orgInput) orgInput.value = res.data.prismatic_organization_id || "";
+        if (urlInput) urlInput.value = res.data.prismatic_webhook_url || "";
+        if (nameInput) nameInput.value = res.data.prismatic_integration_name || "";
+        if (appUrlInput) appUrlInput.value = res.data.prismatic_url || "";
+      }
+    } catch (err) {
+      console.warn("Could not load Prismatic settings:", err);
+    }
+  }
+
+  async function savePrismaticSettings() {
+    const orgId = document.getElementById("prismatic-org-id-input")?.value.trim();
+    const webhookUrl = document.getElementById("prismatic-webhook-url-input")?.value.trim();
+    const name = document.getElementById("prismatic-name-input")?.value.trim();
+    const appUrl = document.getElementById("prismatic-url-input")?.value.trim();
+
+    try {
+      await apiFetch("/integrations/prismatic/settings", {
+        method: "PUT",
+        body: {
+          prismatic_organization_id: orgId,
+          prismatic_webhook_url: webhookUrl,
+          prismatic_integration_name: name,
+          prismatic_url: appUrl,
+        },
+      });
+      showToast("Prismatic Integration Settings updated and saved persistently!", "success");
+    } catch (err) {
+      showToast(`Error saving Prismatic settings: ${err.message}`, "error");
+    }
+  }
+
   async function loadEvents() {
     const typeFilter = document.getElementById("event-type-filter")?.value || "";
     const statusFilter = document.getElementById("event-status-filter")?.value || "";
@@ -821,10 +893,10 @@ const App = (function () {
       .map(
         (ev) => `
       <tr>
-        <td class="mono">${ev.id.substring(0, 8)}...</td>
+        <td>${renderCopyableId(ev.id, "Event ID")}</td>
         <td><strong><code>${ev.event_type}</code></strong></td>
         <td>${ev.entity_type}</td>
-        <td class="mono">${ev.entity_id.substring(0, 8)}...</td>
+        <td>${renderCopyableId(ev.entity_id, "Entity ID")}</td>
         <td><span class="badge badge-${getEventStatusBadge(ev.status)}">${ev.status}</span></td>
         <td>${ev.retry_count}</td>
         <td>${new Date(ev.created_at).toLocaleString()}</td>
@@ -939,7 +1011,7 @@ const App = (function () {
       .map(
         (t) => `
       <tr>
-        <td class="mono">${t.id.substring(0, 8)}...</td>
+        <td>${renderCopyableId(t.id, "Tenant ID")}</td>
         <td><strong>${escapeHtml(t.name)}</strong></td>
         <td><code class="mono">${escapeHtml(t.external_odoo_instance_id)}</code></td>
         <td>${new Date(t.created_at).toLocaleString()}</td>
@@ -977,11 +1049,11 @@ const App = (function () {
   // 8. IDEMPOTENCY SANDBOX TAB
   function generateNewSandboxKey() {
     state.sandboxKey = "idemp-" + Math.random().toString(36).substring(2, 10) + "-" + Date.now();
-    document.getElementById("sandbox-key").value = state.sandboxKey;
-    document.getElementById("sandbox-status-1").textContent = "-";
-    document.getElementById("sandbox-code-1").textContent = '// Click "Submit First Request"';
-    document.getElementById("sandbox-status-2").textContent = "-";
-    document.getElementById("sandbox-code-2").textContent = '// Click "Submit Duplicate Request"';
+    const inputEl = document.getElementById("sandbox-key");
+    if (inputEl) inputEl.value = state.sandboxKey;
+
+    const outputBox = document.getElementById("sandbox-output-box");
+    if (outputBox) outputBox.classList.add("hidden");
   }
 
   async function testIdempotencyRequest(stepNum) {
@@ -992,8 +1064,12 @@ const App = (function () {
       phone: "+1-555-0000",
     };
 
-    const statusEl = document.getElementById(`sandbox-status-${stepNum}`);
-    const codeEl = document.getElementById(`sandbox-code-${stepNum}`);
+    const outputBox = document.getElementById("sandbox-output-box");
+    const statusBadge = document.getElementById("sandbox-status-badge");
+    const cachedFlag = document.getElementById("sandbox-cached-flag");
+    const outputCode = document.getElementById("sandbox-output-code");
+
+    if (outputBox) outputBox.classList.remove("hidden");
 
     try {
       const res = await apiFetch("/customers", {
@@ -1002,9 +1078,16 @@ const App = (function () {
         body,
       });
 
-      statusEl.textContent = `HTTP ${res.status} OK ${stepNum === 2 ? "(Idempotent Cached Match)" : "(Created)"}`;
-      statusEl.style.color = "var(--success)";
-      codeEl.textContent = JSON.stringify(res.data, null, 2);
+      if (statusBadge) {
+        statusBadge.textContent = `HTTP ${res.status} OK`;
+        statusBadge.className = stepNum === 2 ? "badge badge-warning" : "badge badge-success";
+      }
+      if (cachedFlag) {
+        cachedFlag.textContent = stepNum === 2 ? "Intercepted: Returned cached response" : "Initial Request: Entity Created";
+      }
+      if (outputCode) {
+        outputCode.textContent = JSON.stringify(res.data, null, 2);
+      }
 
       if (stepNum === 1) {
         showToast("Initial request completed! Record created in database.", "success");
@@ -1012,9 +1095,12 @@ const App = (function () {
         showToast("Duplicate request intercepted! Returned identical cached response.", "warning");
       }
     } catch (err) {
-      statusEl.textContent = `HTTP Error`;
-      statusEl.style.color = "var(--danger)";
-      codeEl.textContent = err.message;
+      if (statusBadge) {
+        statusBadge.textContent = `HTTP Error`;
+        statusBadge.className = "badge badge-danger";
+      }
+      if (cachedFlag) cachedFlag.textContent = "";
+      if (outputCode) outputCode.textContent = err.message;
     }
   }
 
@@ -1037,6 +1123,7 @@ const App = (function () {
   document.addEventListener("DOMContentLoaded", init);
 
   return {
+    copyToClipboard,
     switchTab,
     toggleTheme,
     seedDatabase,
@@ -1060,6 +1147,8 @@ const App = (function () {
     openOrderStatusModal,
     saveOrderStatus,
     loadEvents,
+    loadPrismaticSettings,
+    savePrismaticSettings,
     viewEventJson,
     retryEvent,
     updateWebhookFormFields,

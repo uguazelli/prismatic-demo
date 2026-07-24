@@ -1078,3 +1078,86 @@ body {
   border-color: var(--primary);
   background: rgba(99, 102, 241, 0.1);
 }
+
+/* Copyable ID styling */
+.copyable-id {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  transition: var(--transition-fast);
+  user-select: none;
+}
+
+.copyable-id:hover {
+  background: rgba(99, 102, 241, 0.18);
+  border-color: var(--primary);
+  color: #a5b4fc;
+}
+
+.copyable-id .copy-icon {
+  font-size: 0.8em;
+  opacity: 0.6;
+  transition: opacity var(--transition-fast);
+}
+
+.copyable-id:hover .copy-icon {
+  opacity: 1;
+}
+
+[data-theme="light"] .copyable-id {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: #cbd5e1;
+}
+
+[data-theme="light"] .copyable-id:hover {
+  background: rgba(99, 102, 241, 0.12);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* Settings Grid & Section Layout */
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.settings-card {
+  background: var(--bg-glass-card);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-main);
+}
+
+.settings-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.settings-card-header h3 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.settings-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.25rem;
+}
