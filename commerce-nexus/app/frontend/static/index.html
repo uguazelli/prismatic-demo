@@ -68,7 +68,7 @@
     <nav class="nav-bar">
       <div class="nav-tabs">
         <button class="nav-tab active" data-tab="overview">
-          <span class="tab-icon">📊</span> Overview
+          <span class="tab-icon">⚡</span> Recent Activity
         </button>
         <button class="nav-tab" data-tab="customers">
           <span class="tab-icon">👥</span> Customers
@@ -90,115 +90,56 @@
 
     <!-- Main Content Area -->
     <main class="main-content">
-      <!-- 1. OVERVIEW TAB -->
+      <!-- 1. RECENT ACTIVITY TAB -->
       <section id="tab-overview" class="tab-panel active">
-        <div class="dashboard-hero">
-          <div class="hero-content">
-            <h2>Multi-Tenant B2B Integration Architecture</h2>
-            <p>Veridata Commerce Nexus syncs customers, products, and order state with Odoo ERP via Prismatic integration flows using asynchronous IntegrationEvents and webhook callbacks.</p>
-          </div>
-          <div class="hero-actions">
-            <button id="btn-connect-odoo" class="btn btn-odoo" onclick="App.connectOdoo()">
-              <span class="odoo-button-mark" aria-hidden="true">O</span>
-              <span id="connect-odoo-label">Connect Odoo</span>
-            </button>
-            <button class="btn btn-primary" onclick="App.openCreateOrderModal()">+ Quick Create Order</button>
-            <button class="btn btn-secondary" onclick="App.switchTab('events')">View Integration Hub</button>
-          </div>
-        </div>
+        <!-- Recent Events Activity Data Table -->
+        <div class="glass-card table-card">
+          <div class="card-header" style="padding: 1rem 1.25rem; flex-wrap: wrap; gap: 1rem; align-items: center; border-bottom: 1px solid var(--border-color);">
+            <div style="display: flex; align-items: center; gap: 0.85rem; flex-wrap: wrap;">
+              <h3 style="margin: 0;">⚡ Recent Integration Activity</h3>
+              <div id="activity-stats-pills" class="activity-stats-pills">
+                <span class="pill-stat total" id="stat-events-total">0 Events</span>
+                <span class="pill-stat processed" id="stat-events-processed">0 Processed</span>
+                <span class="pill-stat pending" id="stat-events-pending">0 Pending</span>
+                <span class="pill-stat failed" id="stat-events-failed" style="display:none;">0 Failed</span>
+              </div>
+            </div>
 
-        <!-- Metrics Grid -->
-        <div class="metrics-grid">
-          <div class="metric-card">
-            <div class="metric-icon customers">👥</div>
-            <div class="metric-info">
-              <span class="metric-label">Total Customers</span>
-              <h3 class="metric-value" id="metric-customers-count">-</h3>
-              <span class="metric-sub" id="metric-customers-synced">- synced</span>
-            </div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-icon products">📦</div>
-            <div class="metric-info">
-              <span class="metric-label">Product SKU Catalog</span>
-              <h3 class="metric-value" id="metric-products-count">-</h3>
-              <span class="metric-sub" id="metric-products-instock">- in stock</span>
-            </div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-icon orders">🛒</div>
-            <div class="metric-info">
-              <span class="metric-label">Active Orders</span>
-              <h3 class="metric-value" id="metric-orders-count">-</h3>
-              <span class="metric-sub" id="metric-orders-revenue">$0.00 total</span>
-            </div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-icon events">⚡</div>
-            <div class="metric-info">
-              <span class="metric-label">Integration Events</span>
-              <h3 class="metric-value" id="metric-events-count">-</h3>
-              <span class="metric-sub" id="metric-events-status">- pending</span>
-            </div>
-          </div>
-        </div>
+            <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
+              <select id="activity-filter-status" class="select-input sm" onchange="App.loadOverview()">
+                <option value="">All Statuses</option>
+                <option value="processed">Processed / Success</option>
+                <option value="pending">Pending</option>
+                <option value="dispatched">Dispatched</option>
+                <option value="failed">Failed</option>
+              </select>
 
-        <!-- Pipeline Architecture & Recent Activity -->
-        <div class="dashboard-grid">
-          <!-- Architecture Flow Diagram Card -->
-          <div class="glass-card pipeline-card">
-            <div class="card-header">
-              <h3>Prismatic &lt;-&gt; Odoo Sync Pipeline</h3>
-              <span class="badge badge-info">Multi-Tenant Architecture</span>
-            </div>
-            <div class="pipeline-flow">
-              <div class="flow-step">
-                <div class="step-box saas">
-                  <span class="step-icon">🏢</span>
-                  <span class="step-title">Veridata SaaS</span>
-                  <span class="step-desc">Create / Update Operations</span>
-                </div>
-              </div>
-              <div class="flow-arrow">➡️</div>
-              <div class="flow-step">
-                <div class="step-box bus">
-                  <span class="step-icon">⚡</span>
-                  <span class="step-title">Integration Event Bus</span>
-                  <span class="step-desc">Event Queue &amp; Retry</span>
-                </div>
-              </div>
-              <div class="flow-arrow">➡️</div>
-              <div class="flow-step">
-                <div class="step-box prismatic">
-                  <span class="step-icon">🔌</span>
-                  <span class="step-title">Prismatic IPaaS</span>
-                  <span class="step-desc">Embedded Integration</span>
-                  <small class="step-desc mono" style="font-size:0.65rem; color:var(--primary);" title="Prismatic Organization ID">Org: T3JnYW5pemF...b3A=</small>
-                </div>
-              </div>
-              <div class="flow-arrow">➡️</div>
-              <div class="flow-step">
-                <div class="step-box odoo">
-                  <span class="step-icon">🟣</span>
-                  <span class="step-title">Odoo ERP</span>
-                  <span class="step-desc">External Instance</span>
-                </div>
-              </div>
-            </div>
-            <div class="pipeline-return">
-              <span class="return-arrow">↩️ Webhook Return Path: <code>POST /webhooks/odoo</code> updates status, external IDs, invoice &amp; payment state</span>
+              <select id="activity-filter-entity" class="select-input sm" onchange="App.loadOverview()">
+                <option value="">All Entities</option>
+                <option value="customer">Customers</option>
+                <option value="product">Products</option>
+                <option value="order">Orders</option>
+              </select>
+
+              <button class="btn btn-sm btn-ghost" onclick="App.refreshOverview()">🔄 Refresh</button>
             </div>
           </div>
 
-          <!-- Recent Events Activity Stream -->
-          <div class="glass-card activity-card">
-            <div class="card-header">
-              <h3>Recent Integration Activity</h3>
-              <button class="btn btn-sm btn-ghost" onclick="App.refreshOverview()">Refresh</button>
-            </div>
-            <div class="activity-list" id="overview-activity-list">
-              <div class="loading-state">Loading recent events...</div>
-            </div>
+          <div class="table-responsive" style="overflow-x: auto; width: 100%;">
+            <table class="data-table" style="width: 100%; table-layout: fixed;">
+              <thead>
+                <tr>
+                  <th style="width: 38%;">Event &amp; Payload Details</th>
+                  <th style="width: 18%; white-space: nowrap;">Timestamp</th>
+                  <th style="width: 14%; white-space: nowrap;">Event ID</th>
+                  <th style="width: 14%; white-space: nowrap;">Entity ID</th>
+                  <th style="width: 16%; text-align: right; white-space: nowrap;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="overview-activity-list">
+                <tr><td colspan="5" class="text-center">Loading recent events...</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
@@ -455,6 +396,63 @@
       <!-- 6. UNIFIED SETTINGS & ADMIN TAB -->
       <section id="tab-settings" class="tab-panel">
         <div class="settings-section">
+
+          <!-- Card 0: Multi-Tenant B2B Integration Architecture & Sync Pipeline -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <h3>🏗️ Multi-Tenant B2B Integration Architecture</h3>
+              <button id="btn-connect-odoo" class="btn btn-odoo btn-sm" onclick="App.connectOdoo()">
+                <span class="odoo-button-mark" aria-hidden="true">O</span> Connect Odoo
+              </button>
+            </div>
+            <p class="sim-intro" style="margin-bottom: 1.25rem;">
+              Veridata Commerce Nexus syncs customers, products, and order state with Odoo ERP via Prismatic integration flows using asynchronous IntegrationEvents and webhook callbacks.
+            </p>
+
+            <div class="glass-card pipeline-card" style="background: var(--bg-surface-elevated); margin-top: 0.5rem;">
+              <div class="card-header">
+                <h3>Prismatic &lt;-&gt; Odoo Sync Pipeline</h3>
+                <span class="badge badge-info">Multi-Tenant Architecture</span>
+              </div>
+              <div class="pipeline-flow">
+                <div class="flow-step">
+                  <div class="step-box saas">
+                    <span class="step-icon">🏢</span>
+                    <span class="step-title">Veridata SaaS</span>
+                    <span class="step-desc">Create / Update Operations</span>
+                  </div>
+                </div>
+                <div class="flow-arrow">➡️</div>
+                <div class="flow-step">
+                  <div class="step-box bus">
+                    <span class="step-icon">⚡</span>
+                    <span class="step-title">Integration Event Bus</span>
+                    <span class="step-desc">Event Queue &amp; Retry</span>
+                  </div>
+                </div>
+                <div class="flow-arrow">➡️</div>
+                <div class="flow-step">
+                  <div class="step-box prismatic">
+                    <span class="step-icon">🔌</span>
+                    <span class="step-title">Prismatic IPaaS</span>
+                    <span class="step-desc">Embedded Integration</span>
+                    <small class="step-desc mono" style="font-size:0.65rem; color:var(--primary);" title="Prismatic Organization ID">Org: T3JnYW5pemF...b3A=</small>
+                  </div>
+                </div>
+                <div class="flow-arrow">➡️</div>
+                <div class="flow-step">
+                  <div class="step-box odoo">
+                    <span class="step-icon">🟣</span>
+                    <span class="step-title">Odoo ERP</span>
+                    <span class="step-desc">External Instance</span>
+                  </div>
+                </div>
+              </div>
+              <div class="pipeline-return">
+                <span class="return-arrow">↩️ Webhook Return Path: <code>POST /webhooks/odoo</code> updates status, external IDs, invoice &amp; payment state</span>
+              </div>
+            </div>
+          </div>
 
           <!-- Card 1: Prismatic Integration Settings -->
           <div class="settings-card">

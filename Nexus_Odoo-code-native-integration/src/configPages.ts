@@ -32,6 +32,14 @@ export const configPages = {
         permissionAndVisibilityType: "customer",
         defaultValue: "demo-acme-api-key",
       }),
+      "Odoo Sync Schedule": configVar({
+        stableKey: "odooSyncSchedule",
+        dataType: "schedule",
+        description:
+          "Schedule for synchronizing changed Odoo contacts to Commerce Nexus",
+        permissionAndVisibilityType: "customer",
+        defaultValue: "*/15 * * * *",
+      }),
     },
   }),
 };

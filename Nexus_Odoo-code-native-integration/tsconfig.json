@@ -3,10 +3,11 @@
     "target": "es6",
     "lib": ["esnext"],
     "strict": true,
+    "types": ["node", "jest"],
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "module": "esnext",
-    "moduleResolution": "node"
+    "moduleResolution": "bundler"
   },
   "include": ["src", ".spectral/*"]
 }

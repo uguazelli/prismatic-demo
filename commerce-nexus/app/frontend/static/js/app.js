@@ -201,18 +201,19 @@ const App = (function () {
   }
 
   function updateOdooButton(isLoading = false) {
-    const button = document.getElementById("btn-connect-odoo");
-    const label = document.getElementById("connect-odoo-label");
-    if (!button || !label) return;
-
     const connected = localStorage.getItem(odooConnectionStorageKey()) === "true";
-    button.disabled = isLoading;
-    button.classList.toggle("connected", connected);
-    label.textContent = isLoading
-      ? "Opening Odoo..."
-      : connected
-        ? "Manage Odoo"
-        : "Connect Odoo";
+    const buttons = document.querySelectorAll(".btn-odoo");
+    buttons.forEach((button) => {
+      button.disabled = isLoading;
+      button.classList.toggle("connected", connected);
+      const labelSpan = button.querySelector("#connect-odoo-label") || button.querySelector(".connect-odoo-label");
+      const text = isLoading ? "Opening Odoo..." : connected ? "Manage Odoo" : "Connect Odoo";
+      if (labelSpan) {
+        labelSpan.textContent = text;
+      } else {
+        button.innerHTML = `<span class="odoo-button-mark" aria-hidden="true">O</span> ${text}`;
+      }
+    });
   }
 
   function setupPrismaticEvents() {
@@ -329,71 +330,190 @@ const App = (function () {
     }
   }
 
-  // 1. OVERVIEW TAB
+  // 1. RECENT ACTIVITY TAB
   async function refreshOverview() {
+    return loadOverview();
+  }
+
+  async function loadOverview() {
     try {
-      const [custRes, prodRes, orderRes, eventRes] = await Promise.allSettled([
-        apiFetch("/customers?page_size=100"),
-        apiFetch("/products?page_size=100"),
-        apiFetch("/orders?page_size=100"),
-        apiFetch("/integration-events?page_size=10"),
-      ]);
+      const statusFilter = document.getElementById("activity-filter-status")?.value || "";
+      const entityFilter = document.getElementById("activity-filter-entity")?.value || "";
 
-      if (custRes.status === "fulfilled") {
-        const custs = custRes.value.data.items || [];
-        document.getElementById("metric-customers-count").textContent = custRes.value.data.total;
-        const synced = custs.filter((c) => c.sync_status === "success").length;
-        document.getElementById("metric-customers-synced").textContent = `${synced} synced with Odoo`;
-      }
+      let queryParams = "?page_size=30";
+      if (statusFilter) queryParams += `&status=${encodeURIComponent(statusFilter)}`;
+      if (entityFilter) queryParams += `&entity_type=${encodeURIComponent(entityFilter)}`;
 
-      if (prodRes.status === "fulfilled") {
-        const prods = prodRes.value.data.items || [];
-        document.getElementById("metric-products-count").textContent = prodRes.value.data.total;
-        const instock = prods.filter((p) => p.stock_quantity > 0).length;
-        document.getElementById("metric-products-instock").textContent = `${instock} in stock`;
-      }
+      const res = await apiFetch(`/integration-events${queryParams}`);
+      const events = res.data.items || [];
+      state.overviewEvents = events;
 
-      if (orderRes.status === "fulfilled") {
-        const orders = orderRes.value.data.items || [];
-        document.getElementById("metric-orders-count").textContent = orderRes.value.data.total;
-        const totalRev = orders.reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0);
-        document.getElementById("metric-orders-revenue").textContent = `$${totalRev.toFixed(2)} total value`;
-      }
+      // Update pill statistics
+      updateActivityStats(events, res.data.total);
 
-      if (eventRes.status === "fulfilled") {
-        const events = eventRes.value.data.items || [];
-        document.getElementById("metric-events-count").textContent = eventRes.value.data.total;
-        const pending = events.filter((e) => e.status === "pending").length;
-        document.getElementById("metric-events-status").textContent = `${pending} pending processing`;
-
-        // Render Recent Activity stream
-        renderOverviewActivity(events);
-      }
+      // Render rich cards
+      renderOverviewActivity(events);
     } catch (e) {
-      showToast("Error loading overview metrics. Check API Key.", "error");
+      showToast("Error loading recent integration activity. Check API Key.", "error");
     }
   }
 
+  function updateActivityStats(events, total) {
+    const elTotal = document.getElementById("stat-events-total");
+    const elProcessed = document.getElementById("stat-events-processed");
+    const elPending = document.getElementById("stat-events-pending");
+    const elFailed = document.getElementById("stat-events-failed");
+
+    if (elTotal) elTotal.textContent = `${total !== undefined ? total : events.length} Events`;
+
+    const processedCount = events.filter((e) => e.status === "processed" || e.status === "success").length;
+    const pendingCount = events.filter((e) => e.status === "pending" || e.status === "dispatched").length;
+    const failedCount = events.filter((e) => e.status === "failed").length;
+
+    if (elProcessed) elProcessed.textContent = `${processedCount} Processed`;
+    if (elPending) elPending.textContent = `${pendingCount} Pending`;
+
+    if (elFailed) {
+      if (failedCount > 0) {
+        elFailed.style.display = "inline-flex";
+        elFailed.textContent = `${failedCount} Failed`;
+      } else {
+        elFailed.style.display = "none";
+      }
+    }
+  }
+
+  function getEventIcon(eventType, entityType) {
+    if (!eventType) return "⚡";
+    if (eventType.includes("customer")) return "👥";
+    if (eventType.includes("product")) return "📦";
+    if (eventType.includes("order")) return "🛒";
+    if (eventType.includes("webhook")) return "⚡";
+    if (entityType === "customer") return "👥";
+    if (entityType === "product") return "📦";
+    if (entityType === "order") return "🛒";
+    return "⚡";
+  }
+
+  function formatEventDetails(ev) {
+    const payload = ev.payload || {};
+    const parts = [];
+
+    if (ev.entity_type === "customer") {
+      if (payload.name) parts.push(`Customer: <strong>${escapeHtml(payload.name)}</strong>`);
+      if (payload.email) parts.push(`<span class="text-dim">(${escapeHtml(payload.email)})</span>`);
+      if (payload.external_id) parts.push(`<span class="badge badge-outline">Odoo Partner ID: ${escapeHtml(payload.external_id)}</span>`);
+    } else if (ev.entity_type === "product") {
+      if (payload.name) parts.push(`Product: <strong>${escapeHtml(payload.name)}</strong>`);
+      if (payload.sku) parts.push(`<span class="mono text-dim">SKU: ${escapeHtml(payload.sku)}</span>`);
+      if (payload.price !== undefined) parts.push(`<span class="text-success">$${Number(payload.price).toFixed(2)}</span>`);
+      if (payload.external_id) parts.push(`<span class="badge badge-outline">Odoo Product ID: ${escapeHtml(payload.external_id)}</span>`);
+    } else if (ev.entity_type === "order") {
+      if (payload.customer_name) parts.push(`Customer: <strong>${escapeHtml(payload.customer_name)}</strong>`);
+      if (payload.total_amount !== undefined) parts.push(`Amount: <strong class="text-success">$${Number(payload.total_amount).toFixed(2)}</strong>`);
+      if (payload.external_id) parts.push(`<span class="badge badge-outline">Odoo Order ID: ${escapeHtml(payload.external_id)}</span>`);
+      if (payload.status) parts.push(`<span class="text-dim">Status: ${escapeHtml(payload.status)}</span>`);
+    } else {
+      const keys = Object.keys(payload).slice(0, 3);
+      if (keys.length > 0) {
+        const preview = keys.map((k) => `${k}: ${payload[k]}`).join(" • ");
+        parts.push(`<span class="text-dim">${escapeHtml(preview)}</span>`);
+      }
+    }
+
+    return parts.length > 0 ? parts.join(" &bull; ") : "<span class=\"text-dim\">No payload metadata</span>";
+  }
+
   function renderOverviewActivity(events) {
-    const list = document.getElementById("overview-activity-list");
+    const tbody = document.getElementById("overview-activity-list");
+    if (!tbody) return;
+
     if (!events || events.length === 0) {
-      list.innerHTML = `<div class="loading-state">No recent integration events found.</div>`;
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5" class="text-center" style="padding: 2.5rem 1rem;">
+            <span style="font-size: 2rem; display: block; margin-bottom: 0.5rem;">🔍</span>
+            <span style="color: var(--text-muted); font-size: 0.875rem;">No matching integration events found.</span>
+          </td>
+        </tr>`;
       return;
     }
 
-    list.innerHTML = events
-      .map(
-        (ev) => `
-      <div class="activity-item">
-        <div class="activity-info">
-          <span class="activity-title">${ev.event_type} (${ev.entity_type})</span>
-          <span class="activity-meta">ID: ${renderCopyableId(ev.id, "Event ID")} &bull; ${new Date(ev.created_at).toLocaleTimeString()}</span>
-        </div>
-        <span class="badge badge-${getEventStatusBadge(ev.status)}">${ev.status}</span>
-      </div>
-    `
-      )
+    tbody.innerHTML = events
+      .map((ev) => {
+        const icon = getEventIcon(ev.event_type, ev.entity_type);
+        const formattedDate = new Date(ev.created_at).toLocaleString([], {
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+        const detailsHtml = formatEventDetails(ev);
+        const hasError = Boolean(ev.last_error);
+
+        return `
+          <tr class="${hasError ? "row-has-error" : ""}">
+            <td style="overflow: hidden;">
+              <div style="display: flex; align-items: flex-start; gap: 0.65rem;">
+                <span class="activity-type-icon-sm">${icon}</span>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.2rem; flex-wrap: wrap;">
+                    <span class="activity-type-title-sm">${escapeHtml(ev.event_type)}</span>
+                    <span class="badge badge-sm badge-${getEventStatusBadge(ev.status)}">${ev.status}</span>
+                    <button class="btn btn-xs btn-secondary" onclick="App.viewOverviewEventJson('${ev.id}')" title="View Payload JSON" style="padding: 0.15rem 0.45rem; font-size: 0.72rem;">
+                      🔍 View Payload
+                    </button>
+                    ${ev.retry_count > 0 ? `<span class="badge badge-warning badge-sm">Retried ${ev.retry_count}x</span>` : ""}
+                  </div>
+                  <div class="activity-payload-preview-sm" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${detailsHtml}</div>
+                  ${hasError ? `<div class="activity-error-inline">⚠️ ${escapeHtml(ev.last_error)}</div>` : ""}
+                </div>
+              </div>
+            </td>
+            <td class="text-dim" style="white-space: nowrap; font-size: 0.8125rem;">
+              ${formattedDate}
+            </td>
+            <td style="white-space: nowrap;">
+              ${renderCopyableId(ev.id, "Event ID")}
+            </td>
+            <td style="white-space: nowrap;">
+              ${renderCopyableId(ev.entity_id, "Entity ID")}
+            </td>
+            <td style="text-align: right; white-space: nowrap;">
+              <div style="display: inline-flex; gap: 0.35rem; align-items: center; justify-content: flex-end;">
+                <button class="btn btn-xs btn-secondary" onclick="App.viewOverviewEventJson('${ev.id}')" title="View Payload JSON">
+                  🔍 View Payload
+                </button>
+                ${
+                  ev.status === "failed" || ev.status === "pending"
+                    ? `<button class="btn btn-xs btn-primary" onclick="App.retryOverviewEvent('${ev.id}')" title="Retry Event Delivery">🔄 Retry</button>`
+                    : ""
+                }
+              </div>
+            </td>
+          </tr>
+        `;
+      })
       .join("");
+  }
+
+  function viewOverviewEventJson(id) {
+    const ev = (state.overviewEvents || []).find((e) => e.id === id) || (state.events || []).find((e) => e.id === id);
+    if (!ev) return;
+    document.getElementById("event-json-title").textContent = `Event Payload: ${ev.event_type} (${ev.id.substring(0, 8)}...)`;
+    document.getElementById("event-json-code").textContent = JSON.stringify(ev.payload || ev, null, 2);
+    document.getElementById("modal-event-json").showModal();
+  }
+
+  async function retryOverviewEvent(id) {
+    try {
+      const res = await apiFetch(`/integration-events/${id}/retry`, { method: "POST" });
+      showToast(`Event re-queued for processing. Status: '${res.data.status}'.`, "success");
+      loadOverview();
+    } catch (err) {
+      showToast("Error retrying event: " + err.message, "error");
+    }
   }
 
   function getEventStatusBadge(status) {
@@ -1217,6 +1337,9 @@ const App = (function () {
     loadEvents,
     loadPrismaticSettings,
     savePrismaticSettings,
+    loadOverview,
+    viewOverviewEventJson,
+    retryOverviewEvent,
     viewEventJson,
     retryEvent,
     updateWebhookFormFields,
