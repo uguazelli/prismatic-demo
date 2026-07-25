@@ -21,6 +21,18 @@ def process_odoo_webhook(db: Session, tenant_id: str, data: OdooWebhook):
         query = query.where(model.external_id == data.external_id)
     entity = db.scalar(query)
     if entity is None:
+        if data.event_id:
+            event = db.scalar(
+                select(IntegrationEvent).where(
+                    IntegrationEvent.tenant_id == tenant_id,
+                    IntegrationEvent.id == data.event_id,
+                )
+            )
+            if event:
+                event.status = "processed"
+                event.processed_at = datetime.now(UTC)
+                db.flush()
+                return None
         raise NotFoundError(data.entity_type.title(), data.entity_id or data.external_id or "unknown")
 
     if data.external_id:

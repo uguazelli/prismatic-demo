@@ -1,6 +1,4 @@
 import { contact } from "./contact";
-import { contactCreate } from "./contactCreate";
-import { contactUpdate } from "./contactUpdate";
-import { contactDelete } from "./contactDelete";
+import { odooToNexusSync } from "./odooToNexusSync";
 
-export default [contact, contactCreate, contactUpdate, contactDelete];
+export default [contact, odooToNexusSync];

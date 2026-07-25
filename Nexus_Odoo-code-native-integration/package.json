@@ -11,16 +11,19 @@
   },
   "eslintConfig": {
     "root": true,
-    "extends": ["@prismatic-io/eslint-config-spectral"]
+    "extends": [
+      "@prismatic-io/eslint-config-spectral"
+    ]
   },
   "dependencies": {
-    "@prismatic-io/spectral": "10.24.0"
+    "@prismatic-io/spectral": "10.24.0",
+    "axios": "^1.18.1"
   },
   "devDependencies": {
-    "@component-manifests/cross-flow": "*",
     "@component-manifests/code": "*",
-    "@component-manifests/odoo": "*",
+    "@component-manifests/cross-flow": "*",
     "@component-manifests/http": "*",
+    "@component-manifests/odoo": "*",
     "@prismatic-io/eslint-config-spectral": "2.1.0",
     "@types/jest": "29.5.14",
     "copy-webpack-plugin": "13.0.0",

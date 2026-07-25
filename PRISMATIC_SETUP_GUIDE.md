@@ -1,6 +1,6 @@
 # Prismatic Code-Native & Embedded Developer Cookbook 📖
 
-Welcome to the developer cookbook for **Commerce Nexus + Prismatic Integration**. This guide contains step-by-step recipes for configuring, building, publishing, and embedding Prismatic Code-Native integrations.
+Welcome to the developer cookbook for **Commerce Nexus + Prismatic Integration**. This guide contains step-by-step recipes for configuring, building, publishing, generating components, and embedding Prismatic Code-Native integrations.
 
 ---
 
@@ -8,10 +8,12 @@ Welcome to the developer cookbook for **Commerce Nexus + Prismatic Integration**
 
 1. [Credentials Cheat Sheet](#1-credentials-cheat-sheet)
 2. [Recipe 1: Obtaining Prismatic Credentials](#recipe-1-obtaining-prismatic-credentials)
-3. [Recipe 2: Code-Native Integration Structure](#recipe-2-code-native-integration-structure)
-4. [Recipe 3: CLI Development Workflow (Build, Import & Publish)](#recipe-3-cli-development-workflow-build-import--publish)
-5. [Recipe 4: Connecting Commerce Nexus Embedded SDK](#recipe-4-connecting-commerce-nexus-embedded-sdk)
-6. [Recipe 5: Architecture Rule – Preventing Double-Creation Loops](#recipe-5-architecture-rule--preventing-double-creation-loops)
+3. [Recipe 2: Pure TypeScript Code-Native Integration Structure](#recipe-2-pure-typescript-code-native-integration-structure)
+4. [Recipe 3: CLI Code Generators & Component Tooling](#recipe-3-cli-code-generators--component-tooling)
+5. [Recipe 4: CLI Development Workflow (Build, Import & Publish)](#recipe-4-cli-development-workflow-build-import--publish)
+6. [Recipe 5: Connecting Commerce Nexus Embedded SDK](#recipe-5-connecting-commerce-nexus-embedded-sdk)
+7. [Recipe 6: Architecture Rule – Preventing Double-Creation Loops](#recipe-6-architecture-rule--preventing-double-creation-loops)
+8. [Recipe 7: Fetching Live Execution Logs via CLI](#recipe-7-fetching-live-execution-logs-via-cli)
 
 ---
 
@@ -60,9 +62,9 @@ Commerce Nexus uses **4 key credentials** to talk to Prismatic:
 
 ---
 
-## Recipe 2: Code-Native Integration Structure
+## Recipe 2: Pure TypeScript Code-Native Integration Structure
 
-All code-native code resides in `Nexus_Odoo-code-native-integration/`:
+All integration code resides in `Nexus_Odoo-code-native-integration/`:
 
 ```
 Nexus_Odoo-code-native-integration/
@@ -70,13 +72,12 @@ Nexus_Odoo-code-native-integration/
 │   ├── index.ts              # Integration Metadata (Name, Category, Icon, Flows)
 │   ├── configPages.ts        # Customer Configuration Wizard pages & inputs
 │   ├── scopedConfigVars.ts   # Reusable connections (Odoo ERP Connection)
-│   ├── componentRegistry.ts  # Registered Spectral components (odoo, http, crossFlow)
-│   └── flows/
-│       ├── index.ts          # Flows exporter
-│       ├── contact.ts        # Main router flow (evaluates action: create|update|delete)
-│       ├── contactCreate.ts  # Creates partner in Odoo & posts back to /webhooks/odoo
-│       ├── contactUpdate.ts  # Updates partner in Odoo & posts back to /webhooks/odoo
-│       └── contactDelete.ts  # Deletes partner in Odoo & posts back to /webhooks/odoo
+│   ├── componentRegistry.ts  # Registered connector manifests (Odoo component)
+│   ├── flows/
+│   │   ├── index.ts          # Exposes single clean entry flow [contact]
+│   │   └── contact.ts        # Single entry flow triggered by Nexus webhook
+│   └── services/
+│       └── odooSync.ts       # Native TS Service: handleCreate, handleUpdate, handleDelete
 ├── assets/
 │   └── icon.png              # Integration icon logo (Veridata VD monogram)
 ├── .spectral/
@@ -84,50 +85,121 @@ Nexus_Odoo-code-native-integration/
 └── package.json              # NPM scripts for building, importing, and publishing
 ```
 
-### Making Fields Visible in Embedded Wizard
-In `src/configPages.ts`, set `permissionAndVisibilityType: "customer"` so the inputs are visible to users in the embedded popover:
+### Flow & Service Separation (Idiomatic TypeScript)
+Instead of low-code wrappers (`crossFlow`, `code.runCode`), we use a **Single Entry Flow** (`contact.ts`) that delegates directly to native TypeScript service functions (`odooSync.ts`):
 
 ```typescript
-export const configPages = {
-  Configuration: configPage({
-    tagline: "Configure your Odoo ERP connection and Nexus settings",
-    elements: {
-      Odoo: "Odoo", // References scopedConfigVars.Odoo
-      "App Base URL": configVar({
-        stableKey: "appBaseUrl",
-        dataType: "string",
-        permissionAndVisibilityType: "customer",
-        defaultValue: "http://localhost:8000",
-      }),
-    },
-  }),
-};
+// src/flows/contact.ts
+export const contact = flow({
+  name: "Contact",
+  stableKey: "contact",
+  description: "Sync Customers between Nexus and Odoo",
+  isSynchronous: true,
+  endpointSecurityType: "customer_optional",
+  onExecution: async (context, params) => {
+    const rawBody = (params.onTrigger as any)?.results?.body ?? (params.onTrigger as any)?.body;
+    const payload = rawBody?.data ?? rawBody ?? {};
+    const action = String(payload.action || "create").toLowerCase();
+
+    if (action === "create") return await handleCreateContact(context, payload);
+    if (action === "update") return await handleUpdateContact(context, payload);
+    if (action === "delete") return await handleDeleteContact(context, payload);
+  },
+});
 ```
 
 ---
 
-## Recipe 3: CLI Development Workflow (Build, Import & Publish)
+## Recipe 3: CLI Code Generators & Component Tooling
 
-You can manage 100% of your integration lifecycle from the terminal without opening the web editor!
+Prismatic provides official CLI commands to scaffold components, generate TypeScript types, and convert low-code templates.
 
-### The All-In-One Command (Recommended)
+### 🛠️ Tool 1: Download Types for Existing Connectors (`@component-manifests/*`)
+When you add a connector (like Odoo, Slack, Salesforce, Shopify) to `src/componentRegistry.ts`, run this command to generate full TypeScript types and autocompletion:
 
-To build, upload draft, AND publish live in one step:
+```bash
+prism components:manifests generate
+```
+*or via `npx`:*
+```bash
+npx @prismatic-io/prism components:manifests generate
+```
+
+### 🛠️ Tool 2: Scaffold a Brand New Custom Connector from Scratch
+If you want to build your own reusable component (e.g. `nexus-custom-erp`):
+
+```bash
+# Interactive scaffolding wizard (Connections, Actions, Triggers, Tests)
+npx @prismatic-io/spectral init
+```
+*or:*
+```bash
+prism components:init my-custom-connector
+```
+
+To publish your custom connector to your Prismatic organization catalog:
+```bash
+prism components:publish
+```
+
+### 🛠️ Tool 3: Convert Low-Code Integrations to Code-Native TypeScript
+If you have an existing low-code visual integration in Prismatic and want to convert it into a local TypeScript project:
+
+```bash
+prism integrations:convert --integration-id <INTEGRATION_ID>
+```
+
+---
+
+## Recipe 4: CLI Development Workflow (Build, Import & Publish)
+
+You can manage 100% of your integration lifecycle from the terminal using standard `prism` CLI commands!
+
+### Step 4.1: Import Draft Definition (`prism integrations:import`)
+Compiles your TypeScript bundle and uploads the draft definition to Prismatic:
 
 ```bash
 cd Nexus_Odoo-code-native-integration
-npm run publish
+npm run build && prism integrations:import
 ```
 
-### What `npm run publish` Does Under the Hood:
+### Step 4.2: Publish Integration Version (`prism integrations:publish`)
+Publishes a new integration version live so embedded users and customer instances can consume it:
 
-1. **Builds Bundle**: `npm run build` (Webpack compiles TypeScript to `dist/index.js`).
-2. **Uploads Draft**: `prism integrations:import` (Uploads code-native package).
-3. **Publishes Version**: `prism integrations:publish $(jq -r .integrationId .spectral/prism.json)` (Publishes draft so the embedded popover serves the new version).
+```bash
+prism integrations:publish $(jq -r .integrationId .spectral/prism.json)
+```
 
 ---
 
-## Recipe 4: Connecting Commerce Nexus Embedded SDK
+### Step 4.3 (Optional): Deploy Version to Active Customer Instance
+If an active customer instance is pinned to an older version, update and deploy it to the newly published version:
+
+```bash
+prism instances:update <INSTANCE_ID> --version <VERSION_ID> --deploy
+```
+
+---
+
+### 💡 NPM Package Scripts (`package.json`)
+
+Inside `package.json`, these commands are mapped to simple NPM scripts for convenience:
+
+```json
+{
+  "scripts": {
+    "build": "webpack",
+    "import": "npm run build && prism integrations:import",
+    "publish": "npm run import && prism integrations:publish $(jq -r .integrationId .spectral/prism.json)"
+  }
+}
+```
+
+Running `npm run publish` executes build, import, and publish sequentially!
+
+---
+
+## Recipe 5: Connecting Commerce Nexus Embedded SDK
 
 ### Backend: Generate RSA Signed JWT (`POST /integrations/prismatic/embedded-token`)
 Commerce Nexus signs a short-lived JWT token containing tenant context:
@@ -172,7 +244,7 @@ window.prismatic.configureInstance({
 
 ---
 
-## Recipe 5: Architecture Rule – Preventing Double-Creation Loops
+## Recipe 6: Architecture Rule – Preventing Double-Creation Loops
 
 ### ⚠️ The Problem: HTTP PUT Recursive Event Loops
 If Prismatic calls `PUT /customers/{id}` on Nexus after creating a partner in Odoo:
@@ -181,20 +253,19 @@ If Prismatic calls `PUT /customers/{id}` on Nexus after creating a partner in Od
 - Prismatic receives `customer.updated` and invokes `Contact Update` $\rightarrow$ resulting in a **duplicate contact created in Odoo**.
 
 ### ✅ The Solution: Callback Endpoint (`POST /webhooks/odoo`)
-In `contactCreate.ts`, `contactUpdate.ts`, and `contactDelete.ts`, Prismatic calls **`POST /webhooks/odoo`**:
+In `src/services/odooSync.ts`, Prismatic calls **`POST /webhooks/odoo`** using native `axios`:
 
 ```typescript
-const callbackResponse = await context.components.http.httpPost({
-  connection: undefined,
-  url: `${baseUrl}/webhooks/odoo`,
+const callbackBody = {
+  event_id: payload.event_id || payload.id,
+  entity_type: "customer",
+  entity_id: payload.id,
+  external_id: odooId,
+  synchronization_result: "success",
+};
+
+await axios.post(`${baseUrl}/webhooks/odoo`, callbackBody, {
   headers: { "Content-Type": "application/json", "X-API-Key": apiKey },
-  data: JSON.stringify({
-    event_id: contact.event_id || contact.id,
-    entity_type: "customer",
-    entity_id: contact.id,
-    external_id: odooId,
-    synchronization_result: "success",
-  }),
 });
 ```
 
@@ -202,18 +273,57 @@ const callbackResponse = await context.components.http.httpPost({
 
 ---
 
+## Recipe 7: Fetching Live Execution Logs via CLI
+
+You can query live execution logs directly from your terminal using the `prism` CLI without needing to open the Prismatic web platform.
+
+### 7.1 Fetch Recent Execution Logs (JSON Format)
+To get the last 5 execution logs across all active instances:
+
+```bash
+prism graphql:query 'query { executionResults(first: 5) { nodes { id startedAt status flow { name } logs { nodes { timestamp severity message } } } } }'
+```
+
+### 7.2 Format Execution Logs as a Terminal Table
+For a clean table view:
+
+```bash
+prism graphql:query 'query { executionResults(first: 5) { nodes { startedAt status flow { name } } } }' \
+  --output table \
+  --data-path executionResults.nodes \
+  --columns startedAt,status,flow.name
+```
+
+### 7.3 Filter Execution Logs by Customer Instance ID
+To inspect logs for a specific customer instance:
+
+```bash
+prism graphql:query 'query($instanceId: ID!) { executionResults(instanceId: $instanceId, first: 5) { nodes { startedAt status logs { nodes { timestamp severity message } } } } }' \
+  --variables '{"instanceId":"SW5zdGFuY2U6..."}'
+```
+
+### 7.4 Fetch Output of a Specific Step Result
+```bash
+prism executions:step-result:get --execution <EXECUTION_ID> --step <STEP_NAME>
+```
+
+---
+
 ## 🍳 Quick Command Summary
 
 ```bash
-# 1. Install Dependencies
-npm install
+# 1. Download TypeScript types for existing connectors
+prism components:manifests generate
 
-# 2. Build TypeScript Bundle
-npm run build
+# 2. Scaffold a brand new custom connector from scratch
+npx @prismatic-io/spectral init
 
-# 3. Import Draft to Prismatic
-npm run import
+# 3. Build & Import Draft to Prismatic
+npm run build && prism integrations:import
 
-# 4. Build, Import, and Publish Live in One Step
-npm run publish
+# 4. Publish New Integration Version Live
+prism integrations:publish $(jq -r .integrationId .spectral/prism.json)
+
+# 5. Fetch Recent Execution Logs via Terminal
+prism graphql:query 'query { executionResults(first: 5) { nodes { startedAt status flow { name } logs { nodes { timestamp severity message } } } } }'
 ```

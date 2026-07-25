@@ -1,52 +1,46 @@
-import { isEqual } from "@prismatic-io/spectral/dist/conditionalLogic";
-/**
- * Your integration will contain one or more flows that each perform different
- * functions. When the flow is invoked, the onTrigger function runs first (if
- * defined), followed by the onExecution function.
- *
- * For information on code-native flows, see
- * https://prismatic.io/docs/integrations/code-native/flows/
- */
-
-// Import core utilities for defining flow logic and handling conditional behavior
 import { flow } from "@prismatic-io/spectral";
+import {
+  handleCreateContact,
+  handleUpdateContact,
+  handleDeleteContact,
+  CustomerPayload,
+} from "../services/odooSync";
 
-// Define a single flow within your integration
 export const contact = flow({
   name: "Contact",
   stableKey: "contact",
-  description: "",
+  description: "Synchronizes Contact/Customer records between Commerce Nexus and Odoo ERP",
   isSynchronous: true,
   endpointSecurityType: "customer_optional",
   onExecution: async (context, params) => {
-    const { configVars } = context;
-    const triggerBody = (params.onTrigger as any)?.results?.body ?? (params.onTrigger as any)?.data ?? params.onTrigger;
-    const payloadData = triggerBody?.data ?? triggerBody;
-    const action = payloadData?.action;
+    const { logger } = context;
 
-    let resultStatus: string;
-    if (isEqual(action, "create")) {
-      await context.components.crossFlow.invokeFlow({
-        data: payloadData,
-        flowName: "Contact Create",
-      });
-      resultStatus = "Create";
-    } else if (isEqual(action, "update")) {
-      await context.components.crossFlow.invokeFlow({
-        data: payloadData,
-        flowName: "Contact Update",
-      });
-      resultStatus = "Update";
-    } else if (isEqual(action, "delete")) {
-      await context.components.crossFlow.invokeFlow({
-        data: payloadData,
-        flowName: "Contact Delete",
-      });
-      resultStatus = "Delete";
+    // Safely extract payload from webhook body
+    const rawBody = (params.onTrigger as any)?.results?.body ?? (params.onTrigger as any)?.body ?? (params.onTrigger as any)?.data ?? params.onTrigger;
+    const payload: CustomerPayload = rawBody?.data ?? rawBody ?? {};
+
+    const action = String(payload.action || "create").toLowerCase();
+
+    logger.info(`Received Contact event trigger [action=${action}]`, {
+      action,
+      id: payload.id || payload.entity_id,
+      name: payload.name,
+      email: payload.email,
+    });
+
+    if (action === "create") {
+      const result = await handleCreateContact(context, payload);
+      return { data: result };
+    } else if (action === "update") {
+      const result = await handleUpdateContact(context, payload);
+      return { data: result };
+    } else if (action === "delete") {
+      const result = await handleDeleteContact(context, payload);
+      return { data: result };
     } else {
-      resultStatus = "Else";
+      logger.warn(`Unhandled event action '${action}'`, { payload });
+      return { data: `Ignored action '${action}'` };
     }
-    return { data: resultStatus };
   },
 });
 
