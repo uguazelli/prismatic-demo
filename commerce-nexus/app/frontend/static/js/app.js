@@ -118,6 +118,7 @@ const App = (function () {
   // Health Check
   async function checkHealth() {
     const badge = document.getElementById("health-status-badge");
+    if (!badge) return;
     try {
       const res = await apiFetch("/health");
       if (res.data.status === "ok") {
@@ -1304,6 +1305,19 @@ const App = (function () {
       .replace(/"/g, "&quot;");
   }
 
+  function switchSettingsSubtab(subtabId) {
+    const buttons = document.querySelectorAll(".subtab-btn");
+    const panels = document.querySelectorAll(".subtab-panel");
+
+    buttons.forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.subtab === subtabId);
+    });
+
+    panels.forEach((panel) => {
+      panel.classList.toggle("active", panel.id === subtabId);
+    });
+  }
+
   // DOMContentLoaded Initializer
   document.addEventListener("DOMContentLoaded", init);
 
@@ -1349,6 +1363,7 @@ const App = (function () {
     saveTenant,
     generateNewSandboxKey,
     testIdempotencyRequest,
+    switchSettingsSubtab,
     closeModal,
   };
 })();

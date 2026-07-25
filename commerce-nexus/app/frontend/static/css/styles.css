@@ -1332,7 +1332,55 @@ body {
   color: var(--primary);
 }
 
-/* Settings Grid & Section Layout */
+/* Settings Subtabs & Section Layout */
+.settings-subtabs {
+  display: flex;
+  gap: 0.65rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.subtab-btn {
+  padding: 0.6rem 1.15rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.subtab-btn:hover {
+  background: var(--bg-surface-elevated);
+  color: var(--text-main);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.subtab-btn.active {
+  background: var(--primary);
+  color: #ffffff;
+  border-color: var(--primary);
+  box-shadow: 0 4px 12px var(--primary-glow);
+}
+
+.subtab-panel {
+  display: none;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.subtab-panel.active {
+  display: flex;
+  animation: fadeIn 0.2s ease-out;
+}
+
 .settings-section {
   display: flex;
   flex-direction: column;
@@ -1376,6 +1424,28 @@ body {
 
 .settings-form-grid .full-width {
   grid-column: 1 / -1;
+}
+
+.settings-form-stacked {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.form-row-2col {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+}
+
+.form-row-full {
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .form-row-2col {
+    grid-template-columns: 1fr;
+  }
 }
 
 .settings-status-box {

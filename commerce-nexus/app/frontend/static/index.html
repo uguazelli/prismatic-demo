@@ -26,47 +26,8 @@
         </div>
       </div>
 
-      <div class="header-controls">
-        <!-- System Health Indicator -->
-        <div class="health-status" id="health-status-badge">
-          <span class="status-dot pulsing"></span>
-          <span class="status-label">Checking API...</span>
-        </div>
-
-        <!-- Tenant Selector -->
-        <div class="tenant-selector-box">
-          <label for="tenant-select" class="tenant-label">Active Tenant:</label>
-          <div class="custom-select-wrapper">
-            <select id="tenant-select" class="tenant-select">
-              <option value="demo-acme-api-key">Acme Distribution (odoo-acme)</option>
-              <option value="demo-globex-api-key">Globex Wholesale (odoo-globex)</option>
-              <option value="custom">-- Custom API Key / Admin --</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Key Input Modal Trigger / Key Display -->
-        <div class="api-key-pill">
-          <span class="key-icon">🔑</span>
-          <span id="active-key-display" class="key-text">demo-acme-api-key</span>
-          <button id="btn-edit-key" class="btn-icon" title="Change API Key" onclick="App.promptApiKey()">✏️</button>
-        </div>
-
-        <!-- Theme Toggle Button -->
-        <button id="btn-theme-toggle" class="theme-toggle-btn" title="Toggle Light/Dark Theme" onclick="App.toggleTheme()">
-          <span id="theme-icon">☀️</span> <span id="theme-label">Light</span>
-        </button>
-
-        <!-- Seed Database Quick Action -->
-        <button class="btn btn-secondary btn-sm" onclick="App.seedDatabase()" title="Seed Demo Tenants & Records">
-          🌱 Seed DB
-        </button>
-      </div>
-    </header>
-
-    <!-- Main Navigation Bar -->
-    <nav class="nav-bar">
-      <div class="nav-tabs">
+      <!-- Main Navigation Tabs in Header -->
+      <nav class="nav-tabs">
         <button class="nav-tab active" data-tab="overview">
           <span class="tab-icon">⚡</span> Recent Activity
         </button>
@@ -85,8 +46,15 @@
         <button class="nav-tab" data-tab="settings">
           <span class="tab-icon">⚙️</span> Settings &amp; Admin
         </button>
+      </nav>
+
+      <div class="header-controls">
+        <!-- Theme Toggle Button -->
+        <button id="btn-theme-toggle" class="theme-toggle-btn" title="Toggle Light/Dark Theme" onclick="App.toggleTheme()">
+          <span id="theme-icon">☀️</span> <span id="theme-label">Light</span>
+        </button>
       </div>
-    </nav>
+    </header>
 
     <!-- Main Content Area -->
     <main class="main-content">
@@ -395,175 +363,202 @@
 
       <!-- 6. UNIFIED SETTINGS & ADMIN TAB -->
       <section id="tab-settings" class="tab-panel">
+        <!-- Sub-navigation Pills for Settings -->
+        <div class="settings-subtabs">
+          <button class="subtab-btn active" data-subtab="subtab-tenants" onclick="App.switchSettingsSubtab('subtab-tenants')">
+            🏢 Tenant &amp; Session Management
+          </button>
+          <button class="subtab-btn" data-subtab="subtab-prismatic" onclick="App.switchSettingsSubtab('subtab-prismatic')">
+            🔌 Odoo &amp; Prismatic Integration
+          </button>
+        </div>
+
         <div class="settings-section">
 
-          <!-- Card 0: Multi-Tenant B2B Integration Architecture & Sync Pipeline -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <h3>🏗️ Multi-Tenant B2B Integration Architecture</h3>
-              <button id="btn-connect-odoo" class="btn btn-odoo btn-sm" onclick="App.connectOdoo()">
-                <span class="odoo-button-mark" aria-hidden="true">O</span> Connect Odoo
-              </button>
-            </div>
-            <p class="sim-intro" style="margin-bottom: 1.25rem;">
-              Veridata Commerce Nexus syncs customers, products, and order state with Odoo ERP via Prismatic integration flows using asynchronous IntegrationEvents and webhook callbacks.
-            </p>
+          <!-- SUB-TAB 1: Tenant & Session Management -->
+          <div id="subtab-tenants" class="subtab-panel active">
+            <!-- Card 1: Active Demo Session & Tenant Controls -->
+            <div class="settings-card">
+              <div class="settings-card-header">
+                <h3>🔑 Active Demo Session &amp; Tenant Configuration</h3>
+                <button class="btn btn-secondary btn-sm" onclick="App.seedDatabase()" title="Seed Demo Tenants & Records">
+                  🌱 Seed DB
+                </button>
+              </div>
+              <p class="sim-intro" style="margin-bottom: 1rem;">Select active tenant workspace, edit API key credentials, or seed initial demo records.</p>
+              
+              <div class="settings-form-grid" style="align-items: center;">
+                <div class="form-group">
+                  <label for="tenant-select">Active Tenant Workspace</label>
+                  <div class="custom-select-wrapper">
+                    <select id="tenant-select" class="tenant-select" style="width: 100%;">
+                      <option value="demo-acme-api-key">Acme Distribution (odoo-acme)</option>
+                      <option value="demo-globex-api-key">Globex Wholesale (odoo-globex)</option>
+                      <option value="custom">-- Custom API Key / Admin --</option>
+                    </select>
+                  </div>
+                </div>
 
-            <div class="glass-card pipeline-card" style="background: var(--bg-surface-elevated); margin-top: 0.5rem;">
-              <div class="card-header">
-                <h3>Prismatic &lt;-&gt; Odoo Sync Pipeline</h3>
-                <span class="badge badge-info">Multi-Tenant Architecture</span>
-              </div>
-              <div class="pipeline-flow">
-                <div class="flow-step">
-                  <div class="step-box saas">
-                    <span class="step-icon">🏢</span>
-                    <span class="step-title">Veridata SaaS</span>
-                    <span class="step-desc">Create / Update Operations</span>
-                  </div>
-                </div>
-                <div class="flow-arrow">➡️</div>
-                <div class="flow-step">
-                  <div class="step-box bus">
-                    <span class="step-icon">⚡</span>
-                    <span class="step-title">Integration Event Bus</span>
-                    <span class="step-desc">Event Queue &amp; Retry</span>
-                  </div>
-                </div>
-                <div class="flow-arrow">➡️</div>
-                <div class="flow-step">
-                  <div class="step-box prismatic">
-                    <span class="step-icon">🔌</span>
-                    <span class="step-title">Prismatic IPaaS</span>
-                    <span class="step-desc">Embedded Integration</span>
-                    <small class="step-desc mono" style="font-size:0.65rem; color:var(--primary);" title="Prismatic Organization ID">Org: T3JnYW5pemF...b3A=</small>
-                  </div>
-                </div>
-                <div class="flow-arrow">➡️</div>
-                <div class="flow-step">
-                  <div class="step-box odoo">
-                    <span class="step-icon">🟣</span>
-                    <span class="step-title">Odoo ERP</span>
-                    <span class="step-desc">External Instance</span>
+                <div class="form-group">
+                  <label>Active API Key</label>
+                  <div class="api-key-pill" style="justify-content: space-between; height: 38px;">
+                    <span style="display: flex; align-items: center; gap: 0.5rem;">
+                      <span class="key-icon">🔑</span>
+                      <span id="active-key-display" class="key-text">demo-acme-api-key</span>
+                    </span>
+                    <button id="btn-edit-key" class="btn-icon" title="Change API Key" onclick="App.promptApiKey()">✏️</button>
                   </div>
                 </div>
               </div>
-              <div class="pipeline-return">
-                <span class="return-arrow">↩️ Webhook Return Path: <code>POST /webhooks/odoo</code> updates status, external IDs, invoice &amp; payment state</span>
+            </div>
+
+            <!-- Card 2: Tenant Administration & Provisioning -->
+            <div class="settings-card">
+              <div class="settings-card-header">
+                <h3>🏢 Tenant Administration &amp; Provisioning</h3>
+                <button class="btn btn-primary btn-sm" onclick="App.openCreateTenantModal()">+ Create New Tenant</button>
+              </div>
+              
+              <div class="table-toolbar" style="margin-bottom: 1rem;">
+                <div class="admin-key-bar">
+                  <span>System Admin Secret Key:</span>
+                  <input type="text" id="admin-key-input" class="text-input sm" value="change-me-admin-key" placeholder="Enter Admin API Key">
+                  <button class="btn btn-secondary btn-sm" onclick="App.loadTenants()">Verify &amp; Load Tenants</button>
+                </div>
+              </div>
+
+              <div class="glass-card table-card">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Tenant ID</th>
+                      <th>Tenant Name</th>
+                      <th>External Odoo Instance ID</th>
+                      <th>Created At</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tenants-table-body">
+                    <tr><td colspan="4" class="text-center">Enter admin key and click "Verify &amp; Load Tenants".</td></tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
 
-          <!-- Card 1: Prismatic Integration Settings -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <h3>⚡ Prismatic Integration Configuration</h3>
-              <button class="btn btn-primary btn-sm" onclick="App.savePrismaticSettings()">💾 Save Integration Settings</button>
-            </div>
-            <p class="sim-intro" style="margin-bottom: 1rem;">Configure the Prismatic Organization ID, Webhook Flow URL, and integration metadata. These settings persist across server restarts.</p>
-            
-            <div class="settings-form-grid">
-              <div class="form-group">
-                <label>Prismatic Organization ID</label>
-                <input type="text" id="prismatic-org-id-input" class="text-input mono" placeholder="e.g. T3JnYW5pemF0aW9uOmUyZDdi...">
-                <small class="help-text">Organization ID used to sign tenant-scoped embedded JWT tokens.</small>
+          <!-- SUB-TAB 2: Odoo & Prismatic Integration -->
+          <div id="subtab-prismatic" class="subtab-panel">
+            <!-- Card 1: Multi-Tenant B2B Integration Architecture & Sync Pipeline -->
+            <div class="settings-card">
+              <div class="settings-card-header">
+                <h3>🏗️ Multi-Tenant B2B Integration Architecture</h3>
+                <button id="btn-connect-odoo" class="btn btn-odoo btn-sm" onclick="App.connectOdoo()">
+                  <span class="odoo-button-mark" aria-hidden="true">O</span> Connect Odoo
+                </button>
               </div>
+              <p class="sim-intro" style="margin-bottom: 1.25rem;">
+                Veridata Commerce Nexus syncs customers, products, and order state with Odoo ERP via Prismatic integration flows using asynchronous IntegrationEvents and webhook callbacks.
+              </p>
 
-              <div class="form-group">
-                <label>Prismatic Webhook Flow URL</label>
-                <input type="text" id="prismatic-webhook-url-input" class="text-input mono" placeholder="https://hooks.prismatic.io/trigger/...">
-                <small class="help-text">Target flow trigger endpoint for customer/product/order events.</small>
-              </div>
-
-              <div class="form-group">
-                <label>Prismatic Integration Name</label>
-                <input type="text" id="prismatic-name-input" class="text-input" placeholder="Veridata Commerce Nexus - Odoo">
-                <small class="help-text">Name of the integration published in the Prismatic marketplace.</small>
-              </div>
-
-              <div class="form-group">
-                <label>Prismatic Base URL</label>
-                <input type="text" id="prismatic-url-input" class="text-input" placeholder="https://app.prismatic.io">
-                <small class="help-text">Prismatic web platform base URL.</small>
-              </div>
-
-              <div class="form-group">
-                <label>Prismatic API Key</label>
-                <input type="text" id="prismatic-api-key-input" class="text-input mono" placeholder="e.g. b59e398e421a1c6d...">
-                <small class="help-text">API Key used for webhook dispatcher authentication.</small>
-              </div>
-
-              <div class="form-group full-width">
-                <label>Prismatic Embedded Private Signing Key (RSA PEM or Base64)</label>
-                <textarea id="prismatic-signing-key-input" class="text-input mono" rows="4" style="resize: vertical; font-size: 0.8rem;" placeholder="Paste RSA Private Key (-----BEGIN RSA PRIVATE KEY----- ...) or Base64 string here"></textarea>
-                <small class="help-text">Private key used to sign tenant-scoped JWT tokens for the Connect Odoo wizard. Takes precedence over server env/file keys.</small>
-              </div>
-            </div>
-
-            <div id="prismatic-settings-status" class="settings-status-box"></div>
-          </div>
-
-          <!-- Card 2: Tenant Administration -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <h3>🏢 Tenant Administration &amp; Provisioning</h3>
-              <button class="btn btn-primary btn-sm" onclick="App.openCreateTenantModal()">+ Create New Tenant</button>
-            </div>
-            
-            <div class="table-toolbar" style="margin-bottom: 1rem;">
-              <div class="admin-key-bar">
-                <span>System Admin Secret Key:</span>
-                <input type="text" id="admin-key-input" class="text-input sm" value="change-me-admin-key" placeholder="Enter Admin API Key">
-                <button class="btn btn-secondary btn-sm" onclick="App.loadTenants()">Verify &amp; Load Tenants</button>
+              <div class="glass-card pipeline-card" style="background: var(--bg-surface-elevated); margin-top: 0.5rem;">
+                <div class="card-header">
+                  <h3>Prismatic &lt;-&gt; Odoo Sync Pipeline</h3>
+                  <span class="badge badge-info">Multi-Tenant Architecture</span>
+                </div>
+                <div class="pipeline-flow">
+                  <div class="flow-step">
+                    <div class="step-box saas">
+                      <span class="step-icon">🏢</span>
+                      <span class="step-title">Veridata SaaS</span>
+                      <span class="step-desc">Create / Update Operations</span>
+                    </div>
+                  </div>
+                  <div class="flow-arrow">➡️</div>
+                  <div class="flow-step">
+                    <div class="step-box bus">
+                      <span class="step-icon">⚡</span>
+                      <span class="step-title">Integration Event Bus</span>
+                      <span class="step-desc">Event Queue &amp; Retry</span>
+                    </div>
+                  </div>
+                  <div class="flow-arrow">➡️</div>
+                  <div class="flow-step">
+                    <div class="step-box prismatic">
+                      <span class="step-icon">🔌</span>
+                      <span class="step-title">Prismatic IPaaS</span>
+                      <span class="step-desc">Embedded Integration</span>
+                      <small class="step-desc mono" style="font-size:0.65rem; color:var(--primary);" title="Prismatic Organization ID">Org: T3JnYW5pemF...b3A=</small>
+                    </div>
+                  </div>
+                  <div class="flow-arrow">➡️</div>
+                  <div class="flow-step">
+                    <div class="step-box odoo">
+                      <span class="step-icon">🟣</span>
+                      <span class="step-title">Odoo ERP</span>
+                      <span class="step-desc">External Instance</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="pipeline-return">
+                  <span class="return-arrow">↩️ Webhook Return Path: <code>POST /webhooks/odoo</code> updates status, external IDs, invoice &amp; payment state</span>
+                </div>
               </div>
             </div>
 
-            <div class="glass-card table-card">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>Tenant ID</th>
-                    <th>Tenant Name</th>
-                    <th>External Odoo Instance ID</th>
-                    <th>Created At</th>
-                  </tr>
-                </thead>
-                <tbody id="tenants-table-body">
-                  <tr><td colspan="4" class="text-center">Enter admin key and click "Verify &amp; Load Tenants".</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
+            <!-- Card 2: Prismatic Integration Settings -->
+            <div class="settings-card">
+              <div class="settings-card-header">
+                <h3>⚡ Prismatic Integration Configuration</h3>
+                <button class="btn btn-primary btn-sm" onclick="App.savePrismaticSettings()">💾 Save Integration Settings</button>
+              </div>
+              <p class="sim-intro" style="margin-bottom: 1rem;">Configure the Prismatic Organization ID, Webhook Flow URL, and integration metadata. These settings persist across server restarts.</p>
+              
+              <div class="settings-form-stacked">
+                <div class="form-row-2col">
+                  <div class="form-group">
+                    <label>Prismatic Organization ID</label>
+                    <input type="text" id="prismatic-org-id-input" class="text-input mono" placeholder="e.g. T3JnYW5pemF0aW9uOmUyZDdi...">
+                    <small class="help-text">Organization ID used to sign tenant-scoped embedded JWT tokens.</small>
+                  </div>
 
-          <!-- Card 3: Idempotency Sandbox -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <h3>🧪 Developer Idempotency Sandbox</h3>
-              <span class="badge badge-warning">HTTP Header Validation</span>
-            </div>
-            <p class="sim-intro">Test the API's duplicate prevention mechanism. When a request includes an <code>Idempotency-Key</code>, re-submitting the exact same key will return the cached response without creating duplicate database records or raising duplicate event triggers.</p>
+                  <div class="form-group">
+                    <label>Prismatic Webhook Flow URL</label>
+                    <input type="text" id="prismatic-webhook-url-input" class="text-input mono" placeholder="https://hooks.prismatic.io/trigger/...">
+                    <small class="help-text">Target flow trigger endpoint for customer/product/order events.</small>
+                  </div>
+                </div>
 
-            <div class="sandbox-controls">
-              <div class="form-group">
-                <label>Idempotency Key Header:</label>
-                <div class="input-with-button">
-                  <input type="text" id="sandbox-key" class="text-input" readonly>
-                  <button class="btn btn-secondary" onclick="App.generateNewSandboxKey()">🔄 New Random Key</button>
+                <div class="form-row-2col">
+                  <div class="form-group">
+                    <label>Prismatic Integration Name</label>
+                    <input type="text" id="prismatic-name-input" class="text-input" placeholder="Veridata Commerce Nexus - Odoo">
+                    <small class="help-text">Name of the integration published in the Prismatic marketplace.</small>
+                  </div>
+
+                  <div class="form-group">
+                    <label>Prismatic Base URL</label>
+                    <input type="text" id="prismatic-url-input" class="text-input" placeholder="https://app.prismatic.io">
+                    <small class="help-text">Prismatic web platform base URL.</small>
+                  </div>
+                </div>
+
+                <div class="form-row-2col">
+                  <div class="form-group">
+                    <label>Prismatic API Key</label>
+                    <input type="text" id="prismatic-api-key-input" class="text-input mono" placeholder="e.g. b59e398e421a1c6d...">
+                    <small class="help-text">API Key used for webhook dispatcher authentication.</small>
+                  </div>
+                </div>
+
+                <div class="form-row-full" style="margin-top: 0.5rem; border-top: 1px solid var(--border-color); padding-top: 1.25rem;">
+                  <div class="form-group">
+                    <label>Prismatic Embedded Private Signing Key (RSA PEM or Base64)</label>
+                    <textarea id="prismatic-signing-key-input" class="text-input mono" rows="4" style="resize: vertical; font-size: 0.8rem;" placeholder="Paste RSA Private Key (-----BEGIN RSA PRIVATE KEY----- ...) or Base64 string here"></textarea>
+                    <small class="help-text">Private key used to sign tenant-scoped JWT tokens for the Connect Odoo wizard. Takes precedence over server env/file keys.</small>
+                  </div>
                 </div>
               </div>
 
-              <div class="sandbox-actions">
-                <button class="btn btn-primary" onclick="App.testIdempotencyRequest(1)">Submit First Request (Creates Entity)</button>
-                <button class="btn btn-secondary" onclick="App.testIdempotencyRequest(2)">Re-submit Same Key (Cached Response)</button>
-              </div>
-            </div>
-
-            <div class="output-box hidden" id="sandbox-output-box">
-              <div class="output-header">
-                <span id="sandbox-status-badge" class="badge"></span>
-                <span id="sandbox-cached-flag" class="mono text-dim"></span>
-              </div>
-              <pre><code id="sandbox-output-code"></code></pre>
+              <div id="prismatic-settings-status" class="settings-status-box"></div>
             </div>
           </div>
 
