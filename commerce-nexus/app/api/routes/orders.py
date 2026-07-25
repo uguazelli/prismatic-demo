@@ -68,3 +68,9 @@ def update_order_status(
     order = service.update_order_status(db, tenant.id, order_id, data.status)
     db.commit()
     return order
+
+
+@router.delete("/{order_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_order(order_id: str, db: DbSession, tenant: CurrentTenant):
+    service.delete_order(db, tenant.id, order_id)
+    db.commit()

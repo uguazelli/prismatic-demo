@@ -1,0 +1,7 @@
+[mcp_servers.prism]
+command = "npx"
+args = ["-y", "@prismatic-io/prism-mcp", "."]
+cwd = "/Users/uguazelli/Documents/Projects/prismatic/Nexus_Odoo-code-native-integration"
+
+[mcp_servers.prism.env]
+PRISMATIC_URL = "https://app.prismatic.io"

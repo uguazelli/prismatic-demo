@@ -1,3 +1,4 @@
+import base64
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from pydantic import SecretStr
@@ -10,7 +11,10 @@ def get_setting(db: Session, key: str, default: str | None = None) -> str | None
     row = db.scalar(select(SystemSetting).where(SystemSetting.key == key))
     if row and row.value is not None:
         return row.value
-    return default if default is not None else getattr(settings, key, None)
+    val = default if default is not None else getattr(settings, key, None)
+    if isinstance(val, SecretStr):
+        return val.get_secret_value()
+    return val
 
 
 def set_setting(db: Session, key: str, value: str | None) -> str | None:
@@ -33,6 +37,8 @@ def set_setting(db: Session, key: str, value: str | None) -> str | None:
         settings.prismatic_url = value
     elif key == "prismatic_api_key":
         settings.prismatic_api_key = SecretStr(value) if value else None
+    elif key == "prismatic_embedded_signing_key":
+        settings.prismatic_embedded_signing_key = SecretStr(value) if value else None
 
     return value
 
@@ -53,3 +59,24 @@ def get_prismatic_organization_id(db: Session) -> str | None:
 def set_prismatic_organization_id(db: Session, org_id: str) -> str:
     set_setting(db, "prismatic_organization_id", org_id)
     return org_id
+
+
+def get_prismatic_signing_key(db: Session) -> str | None:
+    db_key = get_setting(db, "prismatic_embedded_signing_key")
+    if db_key and db_key.strip():
+        val = db_key.strip().replace("\\n", "\n")
+        if val.startswith("-----BEGIN"):
+            return val
+        try:
+            return base64.b64decode(val, validate=True).decode("utf-8")
+        except Exception:
+            return val
+    return settings.prismatic_signing_key
+
+
+def get_prismatic_api_key(db: Session) -> str | None:
+    db_key = get_setting(db, "prismatic_api_key")
+    if db_key and db_key.strip():
+        return db_key.strip()
+    return settings.prismatic_api_key.get_secret_value() if settings.prismatic_api_key else None
+

@@ -15,6 +15,9 @@ class PrismaticSettingsRead(ApiSchema):
     prismatic_webhook_url: str | None = None
     prismatic_integration_name: str | None = None
     prismatic_url: str | None = None
+    prismatic_embedded_signing_key: str | None = None
+    prismatic_api_key: str | None = None
+    has_signing_key: bool = False
 
 
 class PrismaticSettingsUpdate(ApiSchema):
@@ -22,3 +25,6 @@ class PrismaticSettingsUpdate(ApiSchema):
     prismatic_webhook_url: str | None = None
     prismatic_integration_name: str | None = None
     prismatic_url: str | None = None
+    prismatic_embedded_signing_key: str | None = None
+    prismatic_api_key: str | None = None
+

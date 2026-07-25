@@ -445,6 +445,7 @@ const App = (function () {
         <td>${new Date(c.updated_at).toLocaleDateString()}</td>
         <td>
           <button class="btn btn-sm btn-ghost" onclick="App.editCustomer('${c.id}')">✏️ Edit</button>
+          <button class="btn btn-sm btn-ghost-danger" onclick="App.deleteCustomer('${c.id}')">🗑️ Delete</button>
         </td>
       </tr>
     `
@@ -505,6 +506,19 @@ const App = (function () {
     }
   }
 
+  async function deleteCustomer(id) {
+    const cust = state.customers.find((c) => c.id === id);
+    const name = cust ? cust.name : "customer";
+    if (!confirm(`Are you sure you want to delete customer '${name}'?`)) return;
+    try {
+      await apiFetch(`/customers/${id}`, { method: "DELETE" });
+      showToast(`Customer '${name}' deleted successfully! customer.deleted event emitted.`, "success");
+      loadCustomers();
+    } catch (err) {
+      showToast(`Error deleting customer: ${err.message}`, "error");
+    }
+  }
+
   // 3. PRODUCTS TAB
   async function loadProducts() {
     const search = document.getElementById("product-search")?.value || "";
@@ -550,6 +564,7 @@ const App = (function () {
           <td>${new Date(p.updated_at).toLocaleDateString()}</td>
           <td>
             <button class="btn btn-sm btn-ghost" onclick="App.editProduct('${p.id}')">✏️ Edit</button>
+            <button class="btn btn-sm btn-ghost-danger" onclick="App.deleteProduct('${p.id}')">🗑️ Delete</button>
           </td>
         </tr>
       `;
@@ -603,6 +618,19 @@ const App = (function () {
     }
   }
 
+  async function deleteProduct(id) {
+    const prod = state.products.find((p) => p.id === id);
+    const name = prod ? prod.name : "product";
+    if (!confirm(`Are you sure you want to delete product '${name}'?`)) return;
+    try {
+      await apiFetch(`/products/${id}`, { method: "DELETE" });
+      showToast(`Product '${name}' deleted successfully! product.deleted event emitted.`, "success");
+      loadProducts();
+    } catch (err) {
+      showToast(`Error deleting product: ${err.message}`, "error");
+    }
+  }
+
   // 4. ORDERS TAB
   async function loadOrders() {
     const statusFilter = document.getElementById("order-status-filter")?.value || "";
@@ -651,6 +679,7 @@ const App = (function () {
         <td>${new Date(o.created_at).toLocaleDateString()}</td>
         <td>
           <button class="btn btn-sm btn-secondary" onclick="App.openOrderStatusModal('${o.id}', '${o.status}')">Update Status</button>
+          <button class="btn btn-sm btn-ghost-danger" onclick="App.deleteOrder('${o.id}')">🗑️ Delete</button>
         </td>
       </tr>
     `
@@ -820,6 +849,17 @@ const App = (function () {
     }
   }
 
+  async function deleteOrder(id) {
+    if (!confirm(`Are you sure you want to delete order '${id}'?`)) return;
+    try {
+      await apiFetch(`/orders/${id}`, { method: "DELETE" });
+      showToast(`Order deleted successfully! order.deleted event emitted.`, "success");
+      loadOrders();
+    } catch (err) {
+      showToast(`Error deleting order: ${err.message}`, "error");
+    }
+  }
+
   // 5. INTEGRATION HUB & SETTINGS
   async function loadPrismaticSettings() {
     try {
@@ -829,11 +869,31 @@ const App = (function () {
         const urlInput = document.getElementById("prismatic-webhook-url-input");
         const nameInput = document.getElementById("prismatic-name-input");
         const appUrlInput = document.getElementById("prismatic-url-input");
+        const signingKeyInput = document.getElementById("prismatic-signing-key-input");
+        const apiKeyInput = document.getElementById("prismatic-api-key-input");
+        const statusBox = document.getElementById("prismatic-settings-status");
 
         if (orgInput) orgInput.value = res.data.prismatic_organization_id || "";
         if (urlInput) urlInput.value = res.data.prismatic_webhook_url || "";
         if (nameInput) nameInput.value = res.data.prismatic_integration_name || "";
         if (appUrlInput) appUrlInput.value = res.data.prismatic_url || "";
+        if (signingKeyInput) signingKeyInput.value = res.data.prismatic_embedded_signing_key || "";
+        if (apiKeyInput) apiKeyInput.value = res.data.prismatic_api_key || "";
+
+        if (statusBox) {
+          const hasOrg = Boolean(res.data.prismatic_organization_id);
+          const hasKey = Boolean(res.data.has_signing_key);
+          const hasWebhook = Boolean(res.data.prismatic_webhook_url);
+          const hasApiKey = Boolean(res.data.prismatic_api_key);
+
+          statusBox.innerHTML = `
+            <strong>Prismatic Status:</strong>
+            <span class="status-tag ${hasOrg ? 'ok' : 'warn'}">${hasOrg ? '✓ Org ID Configured' : '⚠ Org ID Missing'}</span>
+            <span class="status-tag ${hasKey ? 'ok' : 'warn'}">${hasKey ? '✓ RSA Key Loaded' : '⚠ RSA Key Missing'}</span>
+            <span class="status-tag ${hasWebhook ? 'ok' : 'warn'}">${hasWebhook ? '✓ Webhook URL Configured' : '⚠ Webhook URL Missing'}</span>
+            <span class="status-tag ${hasApiKey ? 'ok' : 'warn'}">${hasApiKey ? '✓ API Key Configured' : '⚠ API Key Missing'}</span>
+          `;
+        }
       }
     } catch (err) {
       console.warn("Could not load Prismatic settings:", err);
@@ -845,6 +905,8 @@ const App = (function () {
     const webhookUrl = document.getElementById("prismatic-webhook-url-input")?.value.trim();
     const name = document.getElementById("prismatic-name-input")?.value.trim();
     const appUrl = document.getElementById("prismatic-url-input")?.value.trim();
+    const signingKey = document.getElementById("prismatic-signing-key-input")?.value;
+    const apiKey = document.getElementById("prismatic-api-key-input")?.value.trim();
 
     try {
       await apiFetch("/integrations/prismatic/settings", {
@@ -854,9 +916,12 @@ const App = (function () {
           prismatic_webhook_url: webhookUrl,
           prismatic_integration_name: name,
           prismatic_url: appUrl,
+          prismatic_embedded_signing_key: signingKey,
+          prismatic_api_key: apiKey,
         },
       });
       showToast("Prismatic Integration Settings updated and saved persistently!", "success");
+      await loadPrismaticSettings();
     } catch (err) {
       showToast(`Error saving Prismatic settings: ${err.message}`, "error");
     }
@@ -1134,10 +1199,12 @@ const App = (function () {
     openCustomerModal,
     editCustomer,
     saveCustomer,
+    deleteCustomer,
     loadProducts,
     openProductModal,
     editProduct,
     saveProduct,
+    deleteProduct,
     loadOrders,
     openCreateOrderModal,
     addOrderLineItem,
@@ -1146,6 +1213,7 @@ const App = (function () {
     saveOrder,
     openOrderStatusModal,
     saveOrderStatus,
+    deleteOrder,
     loadEvents,
     loadPrismaticSettings,
     savePrismaticSettings,

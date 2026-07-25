@@ -68,3 +68,9 @@ def update_customer(
     db.commit()
     db.refresh(customer)
     return customer
+
+
+@router.delete("/{customer_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_customer(customer_id: str, db: DbSession, tenant: CurrentTenant):
+    service.delete_customer(db, tenant.id, customer_id)
+    db.commit()

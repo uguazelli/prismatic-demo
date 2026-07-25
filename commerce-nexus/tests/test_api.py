@@ -79,7 +79,60 @@ def test_customer_event_is_dispatched_to_prismatic(
     assert captured["headers"]["idempotency-key"] == event.id
     assert captured["body"]["event_id"] == event.id
     assert captured["body"]["event_type"] == "customer.created"
-    assert captured["body"]["payload"]["email"] == "grace@example.com"
+    assert captured["body"]["action"] == "create"
+    assert captured["body"]["email"] == "grace@example.com"
+    assert captured["body"]["name"] == "Grace Buyer"
+
+
+def test_customer_update_event_dispatches_flat_payload(
+    client: TestClient, tenants, db_session: Session
+):
+    tenant = tenants[0]
+    created = client.post(
+        "/customers",
+        headers=auth(tenant["key"]),
+        json={"name": "Old Name", "email": "buyer@northwind.example", "phone": "+1-555-0000"},
+    ).json()
+
+    updated = client.put(
+        f"/customers/{created['id']}",
+        headers=auth(tenant["key"]),
+        json={"name": "Northwind Buyer Inc", "phone": "+1-555-0101"},
+    )
+    assert updated.status_code == 200
+
+    event = db_session.scalar(
+        select(IntegrationEvent)
+        .where(
+            IntegrationEvent.entity_id == created["id"],
+            IntegrationEvent.event_type == "customer.updated",
+        )
+    )
+    assert event is not None
+    event.payload["external_id"] = "abc"
+
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(200, json={"executionId": "execution-456"})
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as webhook_client:
+        delivered = dispatch_event(
+            db_session,
+            event,
+            client=webhook_client,
+            webhook_url="https://hooks.prismatic.io/trigger/test",
+        )
+
+    assert delivered is True
+    assert captured["body"]["event_type"] == "customer.updated"
+    assert captured["body"]["action"] == "update"
+    assert captured["body"]["id"] == created["id"]
+    assert captured["body"]["external_id"] == "abc"
+    assert captured["body"]["name"] == "Northwind Buyer Inc"
+    assert captured["body"]["email"] == "buyer@northwind.example"
+    assert captured["body"]["phone"] == "+1-555-0101"
 
 
 def test_failed_prismatic_delivery_can_be_retried(
@@ -302,7 +355,7 @@ def test_prismatic_embedded_token_is_tenant_scoped(client: TestClient, tenants):
     assert claims["customer"] == tenants[0]["id"]
     assert claims["customer"] != tenants[1]["id"]
     assert claims["role"] == "admin"
-    assert body["integration_name"] == "Veridata Commerce Nexus - Odoo"
+    assert body["integration_name"] == "Nexus Odoo Code Native"
 
 
 def test_prismatic_embedded_token_requires_server_signing_key(client: TestClient, tenants):
@@ -331,3 +384,89 @@ def test_seed_endpoint(client: TestClient):
     res = client.post("/seed")
     assert res.status_code == 200
     assert res.json()["status"] == "ok"
+
+
+def test_update_prismatic_settings_signing_key_and_api_key(client: TestClient, tenants):
+    response = client.put(
+        "/integrations/prismatic/settings",
+        headers=auth(tenants[0]["key"]),
+        json={
+            "prismatic_organization_id": "test-org-id",
+            "prismatic_embedded_signing_key": "test-custom-key",
+            "prismatic_api_key": "test-custom-api-key",
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["prismatic_organization_id"] == "test-org-id"
+    assert data["prismatic_embedded_signing_key"] == "test-custom-key"
+    assert data["prismatic_api_key"] == "test-custom-api-key"
+    assert data["has_signing_key"] is True
+
+
+def test_delete_customer_product_and_order(client: TestClient, catalog, db_session: Session):
+    tenant = catalog["tenant"]
+    cust_id = catalog["customer"]["id"]
+    prod_id = catalog["products"][0]["id"]
+
+    # Delete customer with existing orders fails
+    order_res = client.post(
+        "/orders",
+        headers=auth(tenant["key"]),
+        json={"customer_id": cust_id, "items": [{"product_id": prod_id, "quantity": 1}]},
+    )
+    order_id = order_res.json()["id"]
+
+    # Delete order succeeds and emits order.deleted
+    del_order = client.delete(f"/orders/{order_id}", headers=auth(tenant["key"]))
+    assert del_order.status_code == 204
+    assert client.get(f"/orders/{order_id}", headers=auth(tenant["key"])).status_code == 404
+    del_order_event = db_session.scalar(
+        select(IntegrationEvent).where(
+            IntegrationEvent.entity_id == order_id,
+            IntegrationEvent.event_type == "order.deleted",
+        )
+    )
+    assert del_order_event is not None
+
+    # Delete customer succeeds and emits customer.deleted
+    del_cust = client.delete(f"/customers/{cust_id}", headers=auth(tenant["key"]))
+    assert del_cust.status_code == 204
+    assert client.get(f"/customers/{cust_id}", headers=auth(tenant["key"])).status_code == 404
+    del_cust_event = db_session.scalar(
+        select(IntegrationEvent).where(
+            IntegrationEvent.entity_id == cust_id,
+            IntegrationEvent.event_type == "customer.deleted",
+        )
+    )
+    assert del_cust_event is not None
+
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(200, json={"executionId": "del-123"})
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as webhook_client:
+        delivered = dispatch_event(
+            db_session,
+            del_cust_event,
+            client=webhook_client,
+            webhook_url="https://hooks.prismatic.io/trigger/test",
+        )
+
+    assert delivered is True
+    assert captured["body"]["action"] == "delete"
+    assert captured["body"]["event_type"] == "customer.deleted"
+
+    # Delete product succeeds and emits product.deleted
+    del_prod = client.delete(f"/products/{prod_id}", headers=auth(tenant["key"]))
+    assert del_prod.status_code == 204
+    del_prod_event = db_session.scalar(
+        select(IntegrationEvent).where(
+            IntegrationEvent.entity_id == prod_id,
+            IntegrationEvent.event_type == "product.deleted",
+        )
+    )
+    assert del_prod_event is not None
+

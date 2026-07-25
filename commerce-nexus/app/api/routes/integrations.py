@@ -14,7 +14,12 @@ from app.schemas.integration import (
     PrismaticSettingsRead,
     PrismaticSettingsUpdate,
 )
-from app.services.system_settings import get_setting, set_setting
+from app.services.system_settings import (
+    get_prismatic_api_key,
+    get_prismatic_signing_key,
+    get_setting,
+    set_setting,
+)
 
 
 router = APIRouter(prefix="/integrations", tags=["integrations"])
@@ -30,6 +35,8 @@ def _embedded_configuration_error(message: str) -> AppError:
 
 @router.get("/prismatic/settings", response_model=PrismaticSettingsRead)
 def get_prismatic_settings(db: DbSession, tenant: CurrentTenant) -> PrismaticSettingsRead:
+    signing_key = get_prismatic_signing_key(db)
+    api_key = get_prismatic_api_key(db)
     return PrismaticSettingsRead(
         prismatic_organization_id=get_setting(
             db, "prismatic_organization_id", settings.prismatic_organization_id
@@ -41,6 +48,9 @@ def get_prismatic_settings(db: DbSession, tenant: CurrentTenant) -> PrismaticSet
             db, "prismatic_integration_name", settings.prismatic_integration_name
         ),
         prismatic_url=get_setting(db, "prismatic_url", settings.prismatic_url),
+        prismatic_embedded_signing_key=get_setting(db, "prismatic_embedded_signing_key"),
+        prismatic_api_key=api_key,
+        has_signing_key=bool(signing_key),
     )
 
 
@@ -56,6 +66,10 @@ def update_prismatic_settings(
         set_setting(db, "prismatic_integration_name", data.prismatic_integration_name.strip())
     if data.prismatic_url is not None:
         set_setting(db, "prismatic_url", data.prismatic_url.strip())
+    if data.prismatic_embedded_signing_key is not None:
+        set_setting(db, "prismatic_embedded_signing_key", data.prismatic_embedded_signing_key.strip())
+    if data.prismatic_api_key is not None:
+        set_setting(db, "prismatic_api_key", data.prismatic_api_key.strip())
 
     return get_prismatic_settings(db, tenant)
 
@@ -73,10 +87,10 @@ def create_prismatic_embedded_token(
         )
 
     try:
-        signing_key = settings.prismatic_signing_key
+        signing_key = get_prismatic_signing_key(db)
     except (binascii.Error, UnicodeDecodeError) as exc:
         raise _embedded_configuration_error(
-            "PRISMATIC_EMBEDDED_SIGNING_KEY_BASE64 is invalid"
+            "PRISMATIC_EMBEDDED_SIGNING_KEY is invalid"
         ) from exc
 
     if not signing_key:

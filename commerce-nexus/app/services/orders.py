@@ -126,3 +126,19 @@ def list_orders(
         )
     )
     return items, total
+
+
+def delete_order(db: Session, tenant_id: str, order_id: str) -> Order:
+    order = get_order(db, tenant_id, order_id)
+    payload = OrderRead.model_validate(order).model_dump(mode="json")
+    db.delete(order)
+    db.flush()
+    emit_event(
+        db,
+        tenant_id=tenant_id,
+        event_type="order.deleted",
+        entity_type="order",
+        entity_id=order_id,
+        payload=payload,
+    )
+    return order

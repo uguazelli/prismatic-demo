@@ -11,23 +11,50 @@ from app.database import SessionLocal
 from app.models import IntegrationEvent
 
 
-from app.services.system_settings import get_prismatic_webhook_url
+from app.services.system_settings import get_prismatic_api_key, get_prismatic_webhook_url
 
 
 logger = logging.getLogger("app.prismatic")
-CUSTOMER_EVENT_TYPES = ("customer.created", "customer.updated")
+OUTBOUND_EVENT_TYPES = (
+    "customer.created",
+    "customer.updated",
+    "customer.deleted",
+    "product.created",
+    "product.updated",
+    "product.deleted",
+    "order.created",
+    "order.status_changed",
+    "order.deleted",
+)
+
+
+def _derive_action(event_type: str) -> str:
+    if event_type.endswith(".created"):
+        return "create"
+    if event_type.endswith(".updated") or event_type.endswith(".status_changed"):
+        return "update"
+    if event_type.endswith(".deleted"):
+        return "delete"
+    parts = event_type.split(".")
+    return parts[-1] if len(parts) > 1 else event_type
 
 
 def _event_envelope(event: IntegrationEvent) -> dict[str, Any]:
-    return {
+    action = _derive_action(event.event_type)
+    envelope = {
+        "action": action,
         "event_id": event.id,
         "event_type": event.event_type,
         "entity_type": event.entity_type,
         "entity_id": event.entity_id,
         "tenant_id": event.tenant_id,
         "occurred_at": event.created_at.isoformat(),
-        "payload": event.payload,
     }
+    if isinstance(event.payload, dict):
+        for key, value in event.payload.items():
+            if key not in envelope:
+                envelope[key] = value
+    return envelope
 
 
 def dispatch_event(
@@ -41,11 +68,17 @@ def dispatch_event(
 ) -> bool:
     """Attempt one Prismatic delivery and persist the outcome."""
     webhook_url = webhook_url or get_prismatic_webhook_url(db)
-    configured_key = settings.prismatic_api_key
-    api_key = api_key or (configured_key.get_secret_value() if configured_key else None)
+    api_key = api_key or get_prismatic_api_key(db)
     max_attempts = max_attempts or settings.prismatic_dispatch_max_attempts
-    if not webhook_url or not api_key:
+    if not webhook_url:
         return False
+
+    headers = {
+        "Idempotency-Key": event.id,
+        "prismatic-synchronous": "false",
+    }
+    if api_key:
+        headers["api-key"] = api_key
 
     owns_client = client is None
     if client is None:
@@ -58,11 +91,7 @@ def dispatch_event(
     try:
         response = client.post(
             webhook_url,
-            headers={
-                "api-key": api_key,
-                "Idempotency-Key": event.id,
-                "prismatic-synchronous": "false",
-            },
+            headers=headers,
             json=_event_envelope(event),
         )
         response.raise_for_status()
@@ -118,15 +147,18 @@ def dispatch_event(
 
 
 def dispatch_pending_events() -> int:
-    """Dispatch one configured batch of due customer events."""
+    """Dispatch one configured batch of due customer, product, and order events."""
     now = datetime.now(UTC)
     with SessionLocal() as db:
+        webhook_url = get_prismatic_webhook_url(db)
+        if not webhook_url:
+            return 0
         events = list(
             db.scalars(
                 select(IntegrationEvent)
                 .where(
                     IntegrationEvent.status == "pending",
-                    IntegrationEvent.event_type.in_(CUSTOMER_EVENT_TYPES),
+                    IntegrationEvent.event_type.in_(OUTBOUND_EVENT_TYPES),
                     or_(
                         IntegrationEvent.next_attempt_at.is_(None),
                         IntegrationEvent.next_attempt_at <= now,
@@ -140,3 +172,4 @@ def dispatch_pending_events() -> int:
         for event in events:
             delivered += int(dispatch_event(db, event))
         return delivered
+

@@ -42,25 +42,25 @@ async def lifespan(application: FastAPI):
 
     dispatcher_task = None
     stop_dispatcher = asyncio.Event()
-    if settings.prismatic_webhook_url and settings.prismatic_api_key:
-        from app.events.dispatcher import dispatch_pending_events
+    from app.events.dispatcher import dispatch_pending_events
 
-        async def run_dispatcher() -> None:
-            while not stop_dispatcher.is_set():
+    async def run_dispatcher() -> None:
+        while not stop_dispatcher.is_set():
+            if settings.prismatic_webhook_url:
                 try:
                     await asyncio.to_thread(dispatch_pending_events)
                 except Exception:
                     logger.exception("prismatic_dispatcher_failed")
-                try:
-                    await asyncio.wait_for(
-                        stop_dispatcher.wait(),
-                        timeout=settings.prismatic_dispatch_interval_seconds,
-                    )
-                except TimeoutError:
-                    pass
+            try:
+                await asyncio.wait_for(
+                    stop_dispatcher.wait(),
+                    timeout=settings.prismatic_dispatch_interval_seconds,
+                )
+            except TimeoutError:
+                pass
 
-        dispatcher_task = asyncio.create_task(run_dispatcher())
-        logger.info("prismatic_dispatcher_started")
+    dispatcher_task = asyncio.create_task(run_dispatcher())
+    logger.info("prismatic_dispatcher_started")
 
     try:
         yield

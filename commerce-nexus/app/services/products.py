@@ -93,3 +93,19 @@ def list_products(
         )
     )
     return items, total
+
+
+def delete_product(db: Session, tenant_id: str, product_id: str) -> Product:
+    product = get_product(db, tenant_id, product_id)
+    payload = ProductRead.model_validate(product).model_dump(mode="json")
+    db.delete(product)
+    db.flush()
+    emit_event(
+        db,
+        tenant_id=tenant_id,
+        event_type="product.deleted",
+        entity_type="product",
+        entity_id=product_id,
+        payload=payload,
+    )
+    return product

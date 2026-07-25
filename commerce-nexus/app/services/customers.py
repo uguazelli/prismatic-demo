@@ -76,3 +76,19 @@ def list_customers(
         )
     )
     return items, total
+
+
+def delete_customer(db: Session, tenant_id: str, customer_id: str) -> Customer:
+    customer = get_customer(db, tenant_id, customer_id)
+    payload = CustomerRead.model_validate(customer).model_dump(mode="json")
+    db.delete(customer)
+    db.flush()
+    emit_event(
+        db,
+        tenant_id=tenant_id,
+        event_type="customer.deleted",
+        entity_type="customer",
+        entity_id=customer_id,
+        payload=payload,
+    )
+    return customer

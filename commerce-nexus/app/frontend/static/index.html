@@ -488,7 +488,21 @@
                 <input type="text" id="prismatic-url-input" class="text-input" placeholder="https://app.prismatic.io">
                 <small class="help-text">Prismatic web platform base URL.</small>
               </div>
+
+              <div class="form-group">
+                <label>Prismatic API Key</label>
+                <input type="text" id="prismatic-api-key-input" class="text-input mono" placeholder="e.g. b59e398e421a1c6d...">
+                <small class="help-text">API Key used for webhook dispatcher authentication.</small>
+              </div>
+
+              <div class="form-group full-width">
+                <label>Prismatic Embedded Private Signing Key (RSA PEM or Base64)</label>
+                <textarea id="prismatic-signing-key-input" class="text-input mono" rows="4" style="resize: vertical; font-size: 0.8rem;" placeholder="Paste RSA Private Key (-----BEGIN RSA PRIVATE KEY----- ...) or Base64 string here"></textarea>
+                <small class="help-text">Private key used to sign tenant-scoped JWT tokens for the Connect Odoo wizard. Takes precedence over server env/file keys.</small>
+              </div>
             </div>
+
+            <div id="prismatic-settings-status" class="settings-status-box"></div>
           </div>
 
           <!-- Card 2: Tenant Administration -->

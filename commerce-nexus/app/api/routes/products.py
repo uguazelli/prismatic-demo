@@ -63,3 +63,9 @@ def update_product(product_id: str, data: ProductUpdate, db: DbSession, tenant: 
     db.commit()
     db.refresh(product)
     return product
+
+
+@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_product(product_id: str, db: DbSession, tenant: CurrentTenant):
+    service.delete_product(db, tenant.id, product_id)
+    db.commit()
