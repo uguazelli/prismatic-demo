@@ -121,13 +121,13 @@ const App = (function () {
     if (!badge) return;
     try {
       const res = await apiFetch("/health");
-      if (res.data.status === "ok") {
-        badge.innerHTML = `<span class="status-dot online"></span><span class="status-label">API Connected</span>`;
+      if (res && res.data && res.data.status === "ok") {
+        if (badge) badge.innerHTML = `<span class="status-dot online"></span><span class="status-label">API Connected</span>`;
       } else {
-        badge.innerHTML = `<span class="status-dot"></span><span class="status-label">API Offline</span>`;
+        if (badge) badge.innerHTML = `<span class="status-dot"></span><span class="status-label">API Offline</span>`;
       }
     } catch (e) {
-      badge.innerHTML = `<span class="status-dot"></span><span class="status-label">API Error</span>`;
+      if (badge) badge.innerHTML = `<span class="status-dot"></span><span class="status-label">API Error</span>`;
     }
   }
 
