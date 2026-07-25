@@ -529,6 +529,13 @@ body {
   box-shadow: 0 0 0 2px var(--primary-glow);
 }
 
+.text-input:read-only, .select-input:read-only {
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
 .text-input.sm {
   padding: 0.35rem 0.65rem;
   font-size: 0.8125rem;
