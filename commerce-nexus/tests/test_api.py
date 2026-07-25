@@ -288,6 +288,45 @@ def test_odoo_webhook_processing(client: TestClient, catalog, db_session: Sessio
     assert inbound_event.status == "processed"
 
 
+def test_odoo_webhook_updates_customer_by_external_id(client: TestClient, catalog):
+    customer = catalog["customer"]
+    tenant = catalog["tenant"]
+
+    link_response = client.post(
+        "/webhooks/odoo",
+        headers=auth(tenant["key"]),
+        json={
+            "entity_type": "customer",
+            "entity_id": customer["id"],
+            "external_id": "53",
+            "synchronization_result": "success",
+        },
+    )
+    assert link_response.status_code == 200
+
+    update_response = client.post(
+        "/webhooks/odoo",
+        headers=auth(tenant["key"]),
+        json={
+            "action": "sync",
+            "entity_type": "customer",
+            "external_id": "53",
+            "name": "Albert Einstein",
+            "email": "einstein@acme.com",
+            "phone": "+1 438-226-5956",
+            "synchronization_result": "success",
+        },
+    )
+    assert update_response.status_code == 200
+
+    fetched = client.get(f"/customers/{customer['id']}", headers=auth(tenant["key"]))
+    assert fetched.json()["name"] == "Albert Einstein"
+    assert fetched.json()["email"] == "einstein@acme.com"
+    assert fetched.json()["phone"] == "+1 438-226-5956"
+    assert fetched.json()["external_id"] == "53"
+    assert fetched.json()["sync_status"] == "success"
+
+
 def test_pagination_and_filters(client: TestClient, tenants):
     key = tenants[0]["key"]
     for index in range(3):
@@ -469,4 +508,3 @@ def test_delete_customer_product_and_order(client: TestClient, catalog, db_sessi
         )
     )
     assert del_prod_event is not None
-

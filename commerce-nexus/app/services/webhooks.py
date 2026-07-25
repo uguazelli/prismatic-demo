@@ -37,6 +37,15 @@ def process_odoo_webhook(db: Session, tenant_id: str, data: OdooWebhook):
 
     if data.external_id:
         entity.external_id = data.external_id
+
+    if isinstance(entity, Customer) and data.action == "sync":
+        if data.name is not None:
+            entity.name = data.name
+        if data.email is not None:
+            entity.email = str(data.email)
+        if "phone" in data.model_fields_set:
+            entity.phone = data.phone
+
     if data.synchronization_error:
         entity.sync_status = "failed"
     elif data.synchronization_result:

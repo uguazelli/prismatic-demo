@@ -1,7 +1,11 @@
 import { actions as odooActions } from "@component-manifests/odoo";
 import { Connection } from "@prismatic-io/spectral";
 import { configPages } from "../configPages";
-import { odooToNexusSync, searchOdooPartners } from "./odooToNexusSync";
+import {
+  buildCustomerSyncPayload,
+  odooToNexusSync,
+  searchOdooPartners,
+} from "./odooToNexusSync";
 
 jest.mock("@component-manifests/odoo", () => ({
   actions: {
@@ -72,5 +76,24 @@ describe("Odoo to Nexus scheduled sync", () => {
     await expect(
       searchOdooPartners({} as Connection, true, "2026-07-25 10:00:00"),
     ).rejects.toThrow("Odoo search_read returned an unexpected response");
+  });
+
+  it("builds a Nexus customer update payload accepted by the webhook", () => {
+    expect(
+      buildCustomerSyncPayload({
+        id: 53,
+        name: "Albert Einstein",
+        email: "einstein@acme.com",
+        phone: "+1 438-226-5956",
+      }),
+    ).toEqual({
+      action: "sync",
+      entity_type: "customer",
+      external_id: "53",
+      name: "Albert Einstein",
+      email: "einstein@acme.com",
+      phone: "+1 438-226-5956",
+      synchronization_result: "success",
+    });
   });
 });

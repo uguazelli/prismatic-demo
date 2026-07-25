@@ -1,15 +1,19 @@
 from typing import Any, Literal
 
-from pydantic import Field, model_validator
+from pydantic import EmailStr, Field, model_validator
 
 from app.schemas.common import ApiSchema
 
 
 class OdooWebhook(ApiSchema):
+    action: Literal["sync", "delete"] | None = None
     event_id: str | None = Field(default=None, max_length=255)
     entity_type: Literal["customer", "product", "order"]
     entity_id: str | None = None
     external_id: str | None = Field(default=None, max_length=255)
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    email: EmailStr | None = None
+    phone: str | None = Field(default=None, max_length=50)
     invoice_status: str | None = Field(default=None, max_length=50)
     payment_status: str | None = Field(default=None, max_length=50)
     delivery_status: str | None = Field(default=None, max_length=50)

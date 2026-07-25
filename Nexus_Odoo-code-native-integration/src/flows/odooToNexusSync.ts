@@ -3,7 +3,7 @@ import { Connection, flow } from "@prismatic-io/spectral";
 import axios from "axios";
 import { CustomerPayload } from "../services/odooSync";
 
-interface OdooPartner {
+export interface OdooPartner {
   id: number;
   name?: string | false;
   email?: string | false;
@@ -18,6 +18,38 @@ interface ComponentActionResult {
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function getErrorDetails(error: unknown): Record<string, unknown> {
+  if (axios.isAxiosError(error)) {
+    return {
+      error: error.message,
+      status: error.response?.status,
+      response: error.response?.data,
+    };
+  }
+
+  return { error: getErrorMessage(error) };
+}
+
+export function buildCustomerSyncPayload(
+  partner: OdooPartner,
+): CustomerPayload {
+  return {
+    action: "sync",
+    entity_type: "customer",
+    external_id: String(partner.id),
+    name:
+      typeof partner.name === "string" && partner.name
+        ? partner.name
+        : undefined,
+    email:
+      typeof partner.email === "string" && partner.email
+        ? partner.email
+        : undefined,
+    phone: typeof partner.phone === "string" ? partner.phone : undefined,
+    synchronization_result: "success",
+  };
 }
 
 export async function searchOdooPartners(
@@ -106,18 +138,13 @@ export const odooToNexusSync = flow({
       );
 
       let syncedCount = 0;
+      let failedCount = 0;
 
       // Sync Active (Created / Updated) Contacts
       for (const partner of activePartners) {
         if (!partner || (!partner.name && !partner.email)) continue;
 
-        const customerPayload: CustomerPayload = {
-          action: "sync",
-          external_id: String(partner.id),
-          name: partner.name || "",
-          email: partner.email || "",
-          phone: partner.phone || "",
-        };
+        const customerPayload = buildCustomerSyncPayload(partner);
 
         try {
           await axios.post(`${baseUrl}/webhooks/odoo`, customerPayload, {
@@ -129,8 +156,9 @@ export const odooToNexusSync = flow({
           });
           syncedCount++;
         } catch (error: unknown) {
+          failedCount++;
           logger.warn(`Failed to sync active Odoo partner ${partner.id}`, {
-            error: getErrorMessage(error),
+            ...getErrorDetails(error),
           });
         }
       }
@@ -139,7 +167,9 @@ export const odooToNexusSync = flow({
       for (const partner of archivedPartners) {
         const deletePayload: CustomerPayload = {
           action: "delete",
+          entity_type: "customer",
           external_id: String(partner.id),
+          synchronization_result: "success",
         };
 
         try {
@@ -152,10 +182,17 @@ export const odooToNexusSync = flow({
           });
           syncedCount++;
         } catch (error: unknown) {
+          failedCount++;
           logger.warn(`Failed to sync deleted Odoo partner ${partner.id}`, {
-            error: getErrorMessage(error),
+            ...getErrorDetails(error),
           });
         }
+      }
+
+      if (failedCount > 0) {
+        throw new Error(
+          `Failed to sync ${failedCount} Odoo partner${failedCount === 1 ? "" : "s"}; the delta cursor was not advanced`,
+        );
       }
 
       // 4. Persist execution timestamp in instanceState for next poll cycle
