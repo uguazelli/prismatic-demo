@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.events import emit_event
-from app.exceptions import NotFoundError
+from app.exceptions import NotFoundError, ValidationAppError
 from app.models import Customer, IntegrationEvent, Order, Product
 from app.schemas.webhook import OdooWebhook
 
@@ -33,7 +33,29 @@ def process_odoo_webhook(db: Session, tenant_id: str, data: OdooWebhook):
                 event.processed_at = datetime.now(UTC)
                 db.flush()
                 return None
-        raise NotFoundError(data.entity_type.title(), data.entity_id or data.external_id or "unknown")
+
+        if data.entity_type == "customer" and data.action == "delete":
+            return None
+
+        if data.entity_type == "customer" and data.action == "sync" and data.external_id:
+            if data.email is None:
+                raise ValidationAppError(
+                    "Email is required when creating a Nexus customer from Odoo"
+                )
+            entity = Customer(
+                tenant_id=tenant_id,
+                external_id=data.external_id,
+                name=data.name or str(data.email),
+                email=str(data.email),
+                phone=data.phone,
+                sync_status=data.synchronization_result or "success",
+            )
+            db.add(entity)
+            db.flush()
+        else:
+            raise NotFoundError(
+                data.entity_type.title(), data.entity_id or data.external_id or "unknown"
+            )
 
     if data.external_id:
         entity.external_id = data.external_id
@@ -45,6 +67,11 @@ def process_odoo_webhook(db: Session, tenant_id: str, data: OdooWebhook):
             entity.email = str(data.email)
         if "phone" in data.model_fields_set:
             entity.phone = data.phone
+
+    if isinstance(entity, Customer) and data.action == "delete":
+        db.delete(entity)
+        db.flush()
+        return None
 
     if data.synchronization_error:
         entity.sync_status = "failed"

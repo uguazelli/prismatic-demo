@@ -327,6 +327,88 @@ def test_odoo_webhook_updates_customer_by_external_id(client: TestClient, catalo
     assert fetched.json()["sync_status"] == "success"
 
 
+def test_odoo_webhook_upserts_and_deletes_customer_without_outbound_events(
+    client: TestClient, tenants, db_session: Session
+):
+    tenant = tenants[0]
+    create_response = client.post(
+        "/webhooks/odoo",
+        headers=auth(tenant["key"]),
+        json={
+            "action": "sync",
+            "entity_type": "customer",
+            "external_id": "901",
+            "name": "Odoo Customer",
+            "email": "odoo.customer@example.com",
+            "phone": "+1-555-0901",
+            "synchronization_result": "success",
+        },
+    )
+    assert create_response.status_code == 200
+    customer_id = create_response.json()["entity_id"]
+
+    customer = client.get(
+        f"/customers/{customer_id}", headers=auth(tenant["key"])
+    ).json()
+    assert customer["external_id"] == "901"
+    assert customer["name"] == "Odoo Customer"
+    assert customer["sync_status"] == "success"
+    assert db_session.scalar(
+        select(IntegrationEvent).where(
+            IntegrationEvent.entity_id == customer_id,
+            IntegrationEvent.event_type == "customer.created",
+        )
+    ) is None
+
+    update_response = client.post(
+        "/webhooks/odoo",
+        headers=auth(tenant["key"]),
+        json={
+            "action": "sync",
+            "entity_type": "customer",
+            "external_id": "901",
+            "name": "Updated Odoo Customer",
+            "email": "updated.odoo@example.com",
+            "synchronization_result": "success",
+        },
+    )
+    assert update_response.status_code == 200
+    assert update_response.json()["entity_id"] == customer_id
+
+    updated = client.get(
+        f"/customers/{customer_id}", headers=auth(tenant["key"])
+    ).json()
+    assert updated["name"] == "Updated Odoo Customer"
+    assert updated["email"] == "updated.odoo@example.com"
+
+    delete_response = client.post(
+        "/webhooks/odoo",
+        headers=auth(tenant["key"]),
+        json={
+            "action": "delete",
+            "entity_type": "customer",
+            "external_id": "901",
+            "synchronization_result": "success",
+        },
+    )
+    assert delete_response.status_code == 200
+    assert client.get(
+        f"/customers/{customer_id}", headers=auth(tenant["key"])
+    ).status_code == 404
+
+    missing_delete_response = client.post(
+        "/webhooks/odoo",
+        headers=auth(tenant["key"]),
+        json={
+            "action": "delete",
+            "entity_type": "customer",
+            "external_id": "already-deleted",
+            "synchronization_result": "success",
+        },
+    )
+    assert missing_delete_response.status_code == 200
+
+
 def test_pagination_and_filters(client: TestClient, tenants):
     key = tenants[0]["key"]
     for index in range(3):
