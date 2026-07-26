@@ -1,32 +1,32 @@
 import type { FlowExecutionContext } from "@prismatic-io/spectral";
-import {
-  handleCreateContact,
-  handleDeleteContact,
-  handleUpdateContact,
-} from "./odooSync";
 import type { NexusEventPayload } from "./nexusClient";
+import {
+  handleCreateProduct,
+  handleDeleteProduct,
+  handleUpdateProduct,
+} from "./odooProducts";
 
-export async function syncContactEvent(
+export async function syncProductEvent(
   context: FlowExecutionContext,
   payload: NexusEventPayload,
 ) {
   const { logger } = context;
   const action = String(payload.action || "create").toLowerCase();
 
-  logger.info(`Received Contact event trigger [action=${action}]`, {
+  logger.info(`Received Product event trigger [action=${action}]`, {
     action,
     id: payload.id || payload.entity_id,
     name: payload.name,
-    email: payload.email,
+    sku: payload.sku,
   });
 
   switch (action) {
     case "create":
-      return handleCreateContact(context, payload);
+      return handleCreateProduct(context, payload);
     case "update":
-      return handleUpdateContact(context, payload);
+      return handleUpdateProduct(context, payload);
     case "delete":
-      return handleDeleteContact(context, payload);
+      return handleDeleteProduct(context, payload);
     default:
       logger.warn(`Unhandled event action '${action}'`, { payload });
       return `Ignored action '${action}'`;

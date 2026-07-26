@@ -1,12 +1,13 @@
 # Nexus Odoo Code-Native Integration
 
 Prismatic code-native integration for synchronizing Commerce Nexus customers
-with Odoo contacts.
+and products with Odoo.
 
 ## Flows
 
-- `Contact`: receives Commerce Nexus customer webhooks and creates, updates, or
-  deletes the corresponding Odoo partner.
+- `Nexus Events`: receives Commerce Nexus webhooks, routes customer events to
+  Odoo partners, routes product events to Odoo product templates, and ignores
+  order events until order synchronization is implemented.
 - `Odoo to Nexus Sync`: polls changed Odoo partners on a customer-configurable
   schedule and posts updates to Commerce Nexus.
 

@@ -28,7 +28,7 @@ const nexusOdooIntegration = integration({
   name: "Nexus Odoo Code Native",
   category: "ERP",
   description:
-    "Demo code-native integration connecting Veridata Commerce Nexus with Odoo ERP. Features real-time Contact/Customer synchronization with scalable support for additional B2B commerce models.",
+    "Demo code-native integration connecting Veridata Commerce Nexus with Odoo ERP. Features real-time customer and product synchronization plus scheduled contact updates from Odoo.",
   iconPath: "icon.png",
   componentRegistry,
   flows,

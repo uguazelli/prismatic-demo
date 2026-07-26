@@ -1,4 +1,4 @@
-import { contact } from "./contact";
+import { nexusEvents } from "./nexusEvents";
 import { odooToNexusSync } from "./odooToNexusSync";
 
-export default [contact, odooToNexusSync];
+export default [nexusEvents, odooToNexusSync];

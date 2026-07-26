@@ -1,7 +1,7 @@
 import type { FlowExecutionContext } from "@prismatic-io/spectral";
 import axios from "axios";
 
-export interface CustomerPayload {
+export interface NexusEventPayload {
   action?: string;
   event_id?: string;
   event_type?: string;
@@ -11,8 +11,21 @@ export interface CustomerPayload {
   name?: string;
   email?: string;
   phone?: string;
+  sku?: string;
+  price?: number | string;
+  stock_quantity?: number;
   external_id?: string | null;
   synchronization_result?: string;
+}
+
+export type CustomerPayload = NexusEventPayload;
+
+interface NexusCallbackPayload {
+  event_id: string;
+  entity_type: "customer" | "product";
+  entity_id: string;
+  external_id?: string;
+  synchronization_result: "success";
 }
 
 export function getErrorDetails(error: unknown): Record<string, unknown> {
@@ -31,7 +44,7 @@ export function getErrorDetails(error: unknown): Record<string, unknown> {
 
 export async function postNexusWebhook(
   context: FlowExecutionContext,
-  payload: CustomerPayload,
+  payload: NexusEventPayload | NexusCallbackPayload,
 ): Promise<unknown> {
   const baseUrl = String(context.configVars["App Base URL"] || "").replace(
     /\/$/,
@@ -56,4 +69,35 @@ export async function postNexusWebhook(
   );
 
   return response.data;
+}
+
+/** Reports a completed Odoo operation without emitting another Nexus event. */
+export async function notifyNexusCallback(
+  context: FlowExecutionContext,
+  payload: NexusEventPayload,
+  entityType: "customer" | "product",
+  odooId?: string,
+): Promise<unknown> {
+  const { logger } = context;
+  const entityId = payload.id || payload.entity_id || "";
+  const callbackBody: NexusCallbackPayload = {
+    event_id: payload.event_id || entityId,
+    entity_type: entityType,
+    entity_id: entityId,
+    external_id: odooId || payload.external_id || undefined,
+    synchronization_result: "success",
+  };
+
+  logger.info("Posting completion status to Nexus /webhooks/odoo", {
+    callbackBody,
+  });
+
+  try {
+    const response = await postNexusWebhook(context, callbackBody);
+    logger.info("Nexus callback succeeded", { entityType, entityId });
+    return response;
+  } catch (error: unknown) {
+    logger.error("Nexus callback failed", getErrorDetails(error));
+    throw error;
+  }
 }

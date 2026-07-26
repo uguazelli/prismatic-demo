@@ -2,54 +2,18 @@ import { actions as odooActions } from "@component-manifests/odoo";
 import type { FlowExecutionContext } from "@prismatic-io/spectral";
 import {
   getErrorDetails,
-  postNexusWebhook,
-  type CustomerPayload,
+  notifyNexusCallback,
+  type NexusEventPayload,
 } from "./nexusClient";
-
-export type { CustomerPayload } from "./nexusClient";
 
 interface OdooActionResult<T> {
   data: T;
 }
 
-/**
- * Sends a webhook completion status back to Commerce Nexus (/webhooks/odoo)
- * so Nexus can update external_id and sync_status without emitting outbound loops.
- */
-async function notifyNexusCallback(
-  context: FlowExecutionContext,
-  payload: CustomerPayload,
-  odooId?: string,
-) {
-  const { logger } = context;
-  const entityId = payload.id || payload.entity_id || "";
-
-  const callbackBody = {
-    event_id: payload.event_id || entityId,
-    entity_type: "customer",
-    entity_id: entityId,
-    external_id: odooId || payload.external_id || undefined,
-    synchronization_result: "success",
-  };
-
-  logger.info("Posting completion status to Nexus /webhooks/odoo", {
-    callbackBody,
-  });
-
-  try {
-    const response = await postNexusWebhook(context, callbackBody);
-    logger.info("Nexus callback succeeded");
-    return response;
-  } catch (error: unknown) {
-    logger.error("Nexus callback failed", getErrorDetails(error));
-    throw error;
-  }
-}
-
 /** Creates a partner in Odoo and updates Nexus with the Odoo record ID. */
 export async function handleCreateContact(
   context: FlowExecutionContext,
-  payload: CustomerPayload,
+  payload: NexusEventPayload,
 ) {
   const { configVars, logger } = context;
   const name = payload.name || "";
@@ -81,14 +45,19 @@ export async function handleCreateContact(
 
   logger.info("Odoo partner created successfully", { odooId, customerId });
 
-  const callbackResult = await notifyNexusCallback(context, payload, odooId);
+  const callbackResult = await notifyNexusCallback(
+    context,
+    payload,
+    "customer",
+    odooId,
+  );
   return { action: "create", odooId, callbackResult };
 }
 
 /** Updates an existing Odoo partner, creating it when no Odoo ID exists. */
 export async function handleUpdateContact(
   context: FlowExecutionContext,
-  payload: CustomerPayload,
+  payload: NexusEventPayload,
 ) {
   const { configVars, logger } = context;
   const name = payload.name || "";
@@ -120,6 +89,7 @@ export async function handleUpdateContact(
   const callbackResult = await notifyNexusCallback(
     context,
     payload,
+    "customer",
     externalId,
   );
   return { action: "update", externalId, callbackResult };
@@ -128,7 +98,7 @@ export async function handleUpdateContact(
 /** Deletes an Odoo partner when Nexus has an associated Odoo record ID. */
 export async function handleDeleteContact(
   context: FlowExecutionContext,
-  payload: CustomerPayload,
+  payload: NexusEventPayload,
 ) {
   const { configVars, logger } = context;
   const externalId = String(payload.external_id || "");
@@ -153,6 +123,10 @@ export async function handleDeleteContact(
     logger.info("Skipped Odoo deletion because external_id is empty");
   }
 
-  const callbackResult = await notifyNexusCallback(context, payload);
+  const callbackResult = await notifyNexusCallback(
+    context,
+    payload,
+    "customer",
+  );
   return { action: "delete", externalId, callbackResult };
 }
