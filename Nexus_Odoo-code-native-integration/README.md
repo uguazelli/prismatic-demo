@@ -13,7 +13,8 @@ and products with Odoo.
 
 ## Configuration
 
-- `Odoo`: reusable customer-activated Odoo connection.
+- `Odoo`: integration-scoped Odoo connection for entering a unique URL,
+  database, optional port, and API key per customer instance.
 - `App Base URL`: Commerce Nexus API base URL.
 - `App API Key`: Commerce Nexus tenant API key.
 - `Odoo Sync Schedule`: polling schedule for Odoo changes.

@@ -11,17 +11,32 @@
 
 // Import utilities for defining configuration pages and variables
 // Config pages define the UI that deployers use to set up an integration
-import {
-  configPage,
-  configVar,
-  customerActivatedConnection,
-} from "@prismatic-io/spectral";
+import { configPage, configVar } from "@prismatic-io/spectral";
+import { odooOdooApiKey } from "@component-manifests/odoo/dist/connections/odooApiKey";
 
 export const configPages = {
   Configuration: configPage({
     tagline: "Configure your Odoo ERP connection and Nexus settings",
     elements: {
-      Odoo: customerActivatedConnection({ stableKey: "odoo" }),
+      Odoo: odooOdooApiKey("odoo-instance-connection", {
+        baseUrl: {
+          value: "",
+          permissionAndVisibilityType: "customer",
+        },
+        port: {
+          value: "",
+          permissionAndVisibilityType: "customer",
+        },
+        db: {
+          value: "",
+          permissionAndVisibilityType: "customer",
+        },
+        apiKey: {
+          value: "",
+          permissionAndVisibilityType: "customer",
+          writeOnly: true,
+        },
+      }),
       "App Base URL": configVar({
         stableKey: "appBaseUrl",
         dataType: "string",
