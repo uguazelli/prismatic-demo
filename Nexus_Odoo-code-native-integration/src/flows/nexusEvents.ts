@@ -1,5 +1,5 @@
 import { flow } from "@prismatic-io/spectral";
-import { executeNexusEventSync } from "../services/nexusEventSync";
+import { executeNexusEventSync } from "../services/nexus-events";
 
 export const nexusEvents = flow({
   name: "Nexus Events",

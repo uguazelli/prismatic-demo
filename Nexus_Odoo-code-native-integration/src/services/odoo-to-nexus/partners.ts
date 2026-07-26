@@ -1,6 +1,6 @@
 import { actions as odooActions } from "@component-manifests/odoo";
 import type { Connection } from "@prismatic-io/spectral";
-import type { CustomerPayload } from "./nexusClient";
+import type { NexusEventPayload } from "../nexus/types";
 
 export interface OdooPartner {
   id: number;
@@ -46,7 +46,7 @@ export async function searchOdooPartners(
 
 export function buildCustomerSyncPayload(
   partner: OdooPartner,
-): CustomerPayload {
+): NexusEventPayload {
   return {
     action: "sync",
     entity_type: "customer",
@@ -66,7 +66,7 @@ export function buildCustomerSyncPayload(
 
 export function buildCustomerDeletePayload(
   partner: OdooPartner,
-): CustomerPayload {
+): NexusEventPayload {
   return {
     action: "delete",
     entity_type: "customer",

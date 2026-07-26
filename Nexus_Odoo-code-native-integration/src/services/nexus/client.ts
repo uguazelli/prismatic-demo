@@ -1,32 +1,6 @@
 import type { FlowExecutionContext } from "@prismatic-io/spectral";
 import axios from "axios";
-
-export interface NexusEventPayload {
-  action?: string;
-  event_id?: string;
-  event_type?: string;
-  entity_type?: string;
-  entity_id?: string;
-  id?: string;
-  name?: string;
-  email?: string;
-  phone?: string;
-  sku?: string;
-  price?: number | string;
-  stock_quantity?: number;
-  external_id?: string | null;
-  synchronization_result?: string;
-}
-
-export type CustomerPayload = NexusEventPayload;
-
-interface NexusCallbackPayload {
-  event_id: string;
-  entity_type: "customer" | "product";
-  entity_id: string;
-  external_id?: string;
-  synchronization_result: "success";
-}
+import type { NexusCallbackPayload, NexusEventPayload } from "./types";
 
 export function getErrorDetails(error: unknown): Record<string, unknown> {
   if (axios.isAxiosError(error)) {

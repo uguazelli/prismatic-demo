@@ -1,7 +1,7 @@
 import type { FlowOnExecution, TriggerPayload } from "@prismatic-io/spectral";
-import { syncContactEvent } from "./contactSync";
-import type { NexusEventPayload } from "./nexusClient";
-import { syncProductEvent } from "./productSync";
+import type { NexusEventPayload } from "../nexus/types";
+import { syncCustomerEvent } from "./customer";
+import { syncProductEvent } from "./product";
 
 export const executeNexusEventSync: FlowOnExecution<TriggerPayload> = async (
   context,
@@ -20,7 +20,7 @@ export const executeNexusEventSync: FlowOnExecution<TriggerPayload> = async (
 
   switch (entityType) {
     case "customer":
-      return { data: await syncContactEvent(context, payload) };
+      return { data: await syncCustomerEvent(context, payload) };
     case "product":
       return { data: await syncProductEvent(context, payload) };
     case "order":

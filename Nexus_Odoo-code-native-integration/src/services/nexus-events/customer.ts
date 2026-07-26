@@ -1,17 +1,41 @@
 import { actions as odooActions } from "@component-manifests/odoo";
 import type { FlowExecutionContext } from "@prismatic-io/spectral";
-import {
-  getErrorDetails,
-  notifyNexusCallback,
-  type NexusEventPayload,
-} from "./nexusClient";
+import { getErrorDetails, notifyNexusCallback } from "../nexus/client";
+import type { NexusEventPayload } from "../nexus/types";
 
 interface OdooActionResult<T> {
   data: T;
 }
 
-/** Creates a partner in Odoo and updates Nexus with the Odoo record ID. */
-export async function handleCreateContact(
+export async function syncCustomerEvent(
+  context: FlowExecutionContext,
+  payload: NexusEventPayload,
+) {
+  const { logger } = context;
+  const action = String(payload.action || "create").toLowerCase();
+
+  logger.info(`Received Customer event [action=${action}]`, {
+    action,
+    id: payload.id || payload.entity_id,
+    name: payload.name,
+    email: payload.email,
+  });
+
+  switch (action) {
+    case "create":
+      return createCustomerInOdoo(context, payload);
+    case "update":
+      return updateCustomerInOdoo(context, payload);
+    case "delete":
+      return deleteCustomerFromOdoo(context, payload);
+    default:
+      logger.warn(`Unhandled customer action '${action}'`, { payload });
+      return `Ignored action '${action}'`;
+  }
+}
+
+/** Creates an Odoo partner and saves its record ID in Nexus. */
+async function createCustomerInOdoo(
   context: FlowExecutionContext,
   payload: NexusEventPayload,
 ) {
@@ -22,12 +46,7 @@ export async function handleCreateContact(
   const customerId = payload.id || payload.entity_id || "";
   const externalId = customerId ? `external_contact.contact_${customerId}` : "";
 
-  logger.info("Starting handleCreateContact", {
-    name,
-    email,
-    phone,
-    customerId,
-  });
+  logger.info("Creating Odoo partner", { name, email, phone, customerId });
 
   if (!name) {
     logger.warn("Customer name is empty", { payload });
@@ -54,8 +73,8 @@ export async function handleCreateContact(
   return { action: "create", odooId, callbackResult };
 }
 
-/** Updates an existing Odoo partner, creating it when no Odoo ID exists. */
-export async function handleUpdateContact(
+/** Updates an Odoo partner, creating it when no Odoo ID exists. */
+async function updateCustomerInOdoo(
   context: FlowExecutionContext,
   payload: NexusEventPayload,
 ) {
@@ -65,16 +84,11 @@ export async function handleUpdateContact(
   const phone = payload.phone || "";
   const externalId = String(payload.external_id || "");
 
-  logger.info("Starting handleUpdateContact", {
-    name,
-    email,
-    phone,
-    externalId,
-  });
+  logger.info("Updating Odoo partner", { name, email, phone, externalId });
 
   if (!externalId) {
     logger.info("No external_id found; creating the Odoo partner instead");
-    return handleCreateContact(context, payload);
+    return createCustomerInOdoo(context, payload);
   }
 
   await odooActions.updateRecord.perform<OdooActionResult<boolean>>({
@@ -96,14 +110,17 @@ export async function handleUpdateContact(
 }
 
 /** Deletes an Odoo partner when Nexus has an associated Odoo record ID. */
-export async function handleDeleteContact(
+async function deleteCustomerFromOdoo(
   context: FlowExecutionContext,
   payload: NexusEventPayload,
 ) {
   const { configVars, logger } = context;
   const externalId = String(payload.external_id || "");
 
-  logger.info("Starting handleDeleteContact", { externalId, id: payload.id });
+  logger.info("Deleting Odoo partner", {
+    externalId,
+    id: payload.id || payload.entity_id,
+  });
 
   if (externalId) {
     try {

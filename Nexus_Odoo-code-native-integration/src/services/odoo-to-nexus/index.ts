@@ -1,19 +1,16 @@
 import type { FlowExecutionContext } from "@prismatic-io/spectral";
-import {
-  getErrorDetails,
-  postNexusWebhook,
-  type CustomerPayload,
-} from "./nexusClient";
+import { getErrorDetails, postNexusWebhook } from "../nexus/client";
+import type { NexusEventPayload } from "../nexus/types";
 import {
   buildCustomerDeletePayload,
   buildCustomerSyncPayload,
   searchOdooPartners,
   type OdooPartner,
-} from "./odooPartners";
+} from "./partners";
 
 interface SyncItem {
   partner: OdooPartner;
-  payload: CustomerPayload;
+  payload: NexusEventPayload;
   type: "active" | "deleted";
 }
 

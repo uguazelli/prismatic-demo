@@ -1,5 +1,5 @@
 import { flow } from "@prismatic-io/spectral";
-import { executeOdooToNexusSync } from "../services/odooToNexusSync";
+import { executeOdooToNexusSync } from "../services/odoo-to-nexus";
 
 export const odooToNexusSync = flow({
   name: "Odoo to Nexus Sync",

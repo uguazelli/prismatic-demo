@@ -1,13 +1,41 @@
 import { actions as odooActions } from "@component-manifests/odoo";
 import type { FlowExecutionContext } from "@prismatic-io/spectral";
-import { notifyNexusCallback, type NexusEventPayload } from "./nexusClient";
+import { notifyNexusCallback } from "../nexus/client";
+import type { NexusEventPayload } from "../nexus/types";
 
 interface OdooActionResult<T> {
   data: T;
 }
 
+export async function syncProductEvent(
+  context: FlowExecutionContext,
+  payload: NexusEventPayload,
+) {
+  const { logger } = context;
+  const action = String(payload.action || "create").toLowerCase();
+
+  logger.info(`Received Product event [action=${action}]`, {
+    action,
+    id: payload.id || payload.entity_id,
+    name: payload.name,
+    sku: payload.sku,
+  });
+
+  switch (action) {
+    case "create":
+      return createProductInOdoo(context, payload);
+    case "update":
+      return updateProductInOdoo(context, payload);
+    case "delete":
+      return archiveProductInOdoo(context, payload);
+    default:
+      logger.warn(`Unhandled product action '${action}'`, { payload });
+      return `Ignored action '${action}'`;
+  }
+}
+
 /** Creates an Odoo product template and saves its record ID in Nexus. */
-export async function handleCreateProduct(
+async function createProductInOdoo(
   context: FlowExecutionContext,
   payload: NexusEventPayload,
 ) {
@@ -18,12 +46,7 @@ export async function handleCreateProduct(
   const price = Number(payload.price || 0);
   const externalId = productId ? `external_product.product_${productId}` : "";
 
-  logger.info("Starting handleCreateProduct", {
-    productId,
-    name,
-    sku,
-    price,
-  });
+  logger.info("Creating Odoo product", { productId, name, sku, price });
 
   const createResult = await odooActions.createRecord.perform<
     OdooActionResult<number>
@@ -51,7 +74,7 @@ export async function handleCreateProduct(
 }
 
 /** Updates an Odoo product template, creating it when no Odoo ID exists. */
-export async function handleUpdateProduct(
+async function updateProductInOdoo(
   context: FlowExecutionContext,
   payload: NexusEventPayload,
 ) {
@@ -61,16 +84,11 @@ export async function handleUpdateProduct(
   const sku = payload.sku || "";
   const price = Number(payload.price || 0);
 
-  logger.info("Starting handleUpdateProduct", {
-    externalId,
-    name,
-    sku,
-    price,
-  });
+  logger.info("Updating Odoo product", { externalId, name, sku, price });
 
   if (!externalId) {
     logger.info("No external_id found; creating the Odoo product instead");
-    return handleCreateProduct(context, payload);
+    return createProductInOdoo(context, payload);
   }
 
   await odooActions.updateRecord.perform<OdooActionResult<boolean>>({
@@ -96,14 +114,14 @@ export async function handleUpdateProduct(
 }
 
 /** Archives an Odoo product template when Nexus deletes the product. */
-export async function handleDeleteProduct(
+async function archiveProductInOdoo(
   context: FlowExecutionContext,
   payload: NexusEventPayload,
 ) {
   const { configVars, logger } = context;
   const externalId = String(payload.external_id || "");
 
-  logger.info("Starting handleDeleteProduct", {
+  logger.info("Archiving Odoo product", {
     externalId,
     id: payload.id || payload.entity_id,
   });
