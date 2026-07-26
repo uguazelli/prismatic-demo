@@ -3,7 +3,7 @@
     "target": "es6",
     "lib": ["esnext"],
     "strict": true,
-    "types": ["node", "jest"],
+    "types": ["node"],
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "module": "esnext",
