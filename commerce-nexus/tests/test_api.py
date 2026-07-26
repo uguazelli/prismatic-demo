@@ -10,8 +10,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models import Customer, IntegrationEvent, Order
-from app.events.dispatcher import dispatch_event
+from app.models import Customer, IntegrationEvent, Order, Product
+from app.events.dispatcher import dispatch_event, send_event_request
 from tests.conftest import auth
 
 
@@ -77,6 +77,7 @@ def test_customer_event_is_dispatched_to_prismatic(
     assert event.last_error is None
     assert captured["headers"]["api-key"] == "test-prismatic-key"
     assert captured["headers"]["idempotency-key"] == event.id
+    assert captured["headers"]["prismatic-synchronous"] == "false"
     assert captured["body"]["event_id"] == event.id
     assert captured["body"]["event_type"] == "customer.created"
     assert captured["body"]["action"] == "create"
@@ -197,6 +198,133 @@ def test_create_idempotency(client: TestClient, tenants, db_session: Session):
     assert first.json() == second.json()
     assert db_session.scalar(select(func.count()).select_from(Customer)) == 1
     assert db_session.scalar(select(func.count()).select_from(IntegrationEvent)) == 1
+
+
+def test_idempotency_demo_prepares_one_entity_and_dispatched_event(
+    client: TestClient, tenants, db_session: Session
+):
+    tenant = tenants[0]
+
+    customer_response = client.post(
+        "/demo/idempotency/customers",
+        headers=auth(tenant["key"]),
+        json={
+            "name": "Duplicate Delivery Customer",
+            "email": "duplicate-demo@example.com",
+            "phone": "+1-555-0199",
+        },
+    )
+    assert customer_response.status_code == 201
+    assert customer_response.json()["entity_type"] == "customer"
+
+    product_response = client.post(
+        "/demo/idempotency/products",
+        headers=auth(tenant["key"]),
+        json={
+            "sku": "DUPLICATE-DEMO-001",
+            "name": "Duplicate Delivery Product",
+            "price": "29.99",
+            "stock_quantity": 5,
+        },
+    )
+    assert product_response.status_code == 201
+    assert product_response.json()["entity_type"] == "product"
+
+    assert db_session.scalar(select(func.count()).select_from(Customer)) == 1
+    assert db_session.scalar(select(func.count()).select_from(Product)) == 1
+    events = list(db_session.scalars(select(IntegrationEvent)))
+    assert len(events) == 2
+    assert {event.entity_type for event in events} == {"customer", "product"}
+    assert all(event.status == "dispatched" for event in events)
+
+
+def test_idempotency_demo_delivers_identical_event_twice(
+    client: TestClient, tenants, monkeypatch
+):
+    tenant = tenants[0]
+    prepared = client.post(
+        "/demo/idempotency/products",
+        headers=auth(tenant["key"]),
+        json={
+            "sku": "REDIS-DEMO-001",
+            "name": "Redis Guard Demo",
+            "price": "49.95",
+            "stock_quantity": 10,
+        },
+    ).json()
+    captured: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(
+            {
+                "body": json.loads(request.content),
+                "idempotency_key": request.headers["idempotency-key"],
+                "synchronous": request.headers["prismatic-synchronous"],
+            }
+        )
+        return httpx.Response(
+            200,
+            json={"executionId": f"execution-{len(captured)}"},
+        )
+
+    def fake_send_event_request(
+        event,
+        *,
+        webhook_url,
+        api_key=None,
+        synchronous=False,
+        client=None,
+    ):
+        return send_event_request(
+            event,
+            webhook_url=webhook_url,
+            api_key=api_key,
+            synchronous=synchronous,
+            client=webhook_client,
+        )
+
+    monkeypatch.setattr(
+        "app.services.idempotency_demo.send_event_request",
+        fake_send_event_request,
+    )
+    original_webhook_url = settings.prismatic_webhook_url
+    settings.prismatic_webhook_url = "https://hooks.prismatic.io/trigger/demo"
+    try:
+        with httpx.Client(transport=httpx.MockTransport(handler)) as webhook_client:
+            first = client.post(
+                f"/demo/idempotency/events/{prepared['event_id']}/deliver",
+                headers=auth(tenant["key"]),
+            )
+            second = client.post(
+                f"/demo/idempotency/events/{prepared['event_id']}/deliver",
+                headers=auth(tenant["key"]),
+            )
+    finally:
+        settings.prismatic_webhook_url = original_webhook_url
+
+    assert first.status_code == second.status_code == 200
+    assert len(captured) == 2
+    assert captured[0] == captured[1]
+    assert captured[0]["body"]["event_id"] == prepared["event_id"]
+    assert captured[0]["body"]["entity_id"] == prepared["entity_id"]
+    assert captured[0]["idempotency_key"] == prepared["event_id"]
+    assert captured[0]["synchronous"] == "true"
+
+
+def test_idempotency_demo_event_cannot_cross_tenants(client: TestClient, tenants):
+    first, second = tenants
+    prepared = client.post(
+        "/demo/idempotency/customers",
+        headers=auth(first["key"]),
+        json={"name": "Tenant Private", "email": "tenant-private@example.com"},
+    ).json()
+
+    response = client.post(
+        f"/demo/idempotency/events/{prepared['event_id']}/deliver",
+        headers=auth(second["key"]),
+    )
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "not_found"
 
 
 def test_order_creation_and_integration_event(

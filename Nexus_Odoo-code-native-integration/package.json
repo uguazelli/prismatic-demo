@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@prismatic-io/spectral": "10.24.0",
+    "@upstash/redis": "^1.38.0",
     "axios": "^1.18.1"
   },
   "devDependencies": {

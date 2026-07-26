@@ -2,6 +2,7 @@ export interface NexusEventPayload {
   action?: string;
   event_id?: string;
   event_type?: string;
+  tenant_id?: string;
   entity_type?: string;
   entity_id?: string;
   id?: string;

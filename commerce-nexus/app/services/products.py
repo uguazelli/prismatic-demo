@@ -26,7 +26,13 @@ def _ensure_unique_sku(
         raise ConflictError(f"Product SKU '{sku}' already exists for this tenant")
 
 
-def create_product(db: Session, tenant_id: str, data: ProductCreate) -> Product:
+def create_product(
+    db: Session,
+    tenant_id: str,
+    data: ProductCreate,
+    *,
+    event_status: str = "pending",
+) -> Product:
     _ensure_unique_sku(db, tenant_id, data.sku)
     product = Product(tenant_id=tenant_id, **data.model_dump())
     db.add(product)
@@ -38,6 +44,7 @@ def create_product(db: Session, tenant_id: str, data: ProductCreate) -> Product:
         entity_type="product",
         entity_id=product.id,
         payload=ProductRead.model_validate(product).model_dump(mode="json"),
+        status=event_status,
     )
     return product
 

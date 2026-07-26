@@ -11,7 +11,11 @@
 
 // Import utilities for defining configuration pages and variables
 // Config pages define the UI that deployers use to set up an integration
-import { configPage, configVar } from "@prismatic-io/spectral";
+import {
+  configPage,
+  configVar,
+  connectionConfigVar,
+} from "@prismatic-io/spectral";
 import { odooOdooApiKey } from "@component-manifests/odoo/dist/connections/odooApiKey";
 
 export const configPages = {
@@ -35,6 +39,32 @@ export const configPages = {
           value: "",
           permissionAndVisibilityType: "customer",
           writeOnly: true,
+        },
+      }),
+      "Upstash Redis": connectionConfigVar({
+        stableKey: "upstash-redis-connection",
+        dataType: "connection",
+        description:
+          "Redis connection used to prevent duplicate Nexus product events",
+        permissionAndVisibilityType: "customer",
+        inputs: {
+          restUrl: {
+            label: "REST URL",
+            type: "string",
+            required: true,
+            shown: true,
+            permissionAndVisibilityType: "customer",
+            comments: "The HTTPS REST URL from the Upstash Redis console",
+          },
+          restToken: {
+            label: "REST Token",
+            type: "password",
+            required: true,
+            shown: true,
+            writeOnly: true,
+            permissionAndVisibilityType: "customer",
+            comments: "The replacement Upstash Redis REST token",
+          },
         },
       }),
       "App Base URL": configVar({

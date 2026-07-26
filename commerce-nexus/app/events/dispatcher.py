@@ -39,7 +39,7 @@ def _derive_action(event_type: str) -> str:
     return parts[-1] if len(parts) > 1 else event_type
 
 
-def _event_envelope(event: IntegrationEvent) -> dict[str, Any]:
+def event_envelope(event: IntegrationEvent) -> dict[str, Any]:
     action = _derive_action(event.event_type)
     envelope = {
         "action": action,
@@ -55,6 +55,40 @@ def _event_envelope(event: IntegrationEvent) -> dict[str, Any]:
             if key not in envelope:
                 envelope[key] = value
     return envelope
+
+
+def send_event_request(
+    event: IntegrationEvent,
+    *,
+    webhook_url: str,
+    api_key: str | None = None,
+    synchronous: bool = False,
+    client: httpx.Client | None = None,
+) -> httpx.Response:
+    """Send one event delivery without changing its persisted status."""
+    headers = {
+        "Idempotency-Key": event.id,
+        "prismatic-synchronous": str(synchronous).lower(),
+    }
+    if api_key:
+        headers["api-key"] = api_key
+
+    owns_client = client is None
+    if client is None:
+        client = httpx.Client(
+            follow_redirects=True,
+            timeout=settings.prismatic_webhook_timeout_seconds,
+        )
+
+    try:
+        return client.post(
+            webhook_url,
+            headers=headers,
+            json=event_envelope(event),
+        )
+    finally:
+        if owns_client:
+            client.close()
 
 
 def dispatch_event(
@@ -73,26 +107,13 @@ def dispatch_event(
     if not webhook_url:
         return False
 
-    headers = {
-        "Idempotency-Key": event.id,
-        "prismatic-synchronous": "false",
-    }
-    if api_key:
-        headers["api-key"] = api_key
-
-    owns_client = client is None
-    if client is None:
-        client = httpx.Client(
-            follow_redirects=True,
-            timeout=settings.prismatic_webhook_timeout_seconds,
-        )
-
     attempted_at = datetime.now(UTC)
     try:
-        response = client.post(
-            webhook_url,
-            headers=headers,
-            json=_event_envelope(event),
+        response = send_event_request(
+            event,
+            webhook_url=webhook_url,
+            api_key=api_key,
+            client=client,
         )
         response.raise_for_status()
     except httpx.HTTPError as exc:
@@ -120,10 +141,6 @@ def dispatch_event(
             },
         )
         return False
-    finally:
-        if owns_client:
-            client.close()
-
     event.status = "dispatched"
     event.last_attempted_at = attempted_at
     event.next_attempt_at = None
@@ -172,4 +189,3 @@ def dispatch_pending_events() -> int:
         for event in events:
             delivered += int(dispatch_event(db, event))
         return delivered
-

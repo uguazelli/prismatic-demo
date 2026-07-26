@@ -371,6 +371,9 @@
           <button class="subtab-btn" data-subtab="subtab-prismatic" onclick="App.switchSettingsSubtab('subtab-prismatic')">
             🔌 Odoo &amp; Prismatic Integration
           </button>
+          <button class="subtab-btn" data-subtab="subtab-idempotency" onclick="App.switchSettingsSubtab('subtab-idempotency')">
+            🛡️ Idempotency Demo
+          </button>
         </div>
 
         <div class="settings-section">
@@ -559,6 +562,49 @@
               </div>
 
               <div id="prismatic-settings-status" class="settings-status-box"></div>
+            </div>
+          </div>
+
+          <!-- SUB-TAB 3: Duplicate Delivery Idempotency Demo -->
+          <div id="subtab-idempotency" class="subtab-panel">
+            <div class="settings-card">
+              <div class="settings-card-header">
+                <h3>🛡️ Duplicate Webhook Delivery Lab</h3>
+                <span class="badge badge-info">Same event, delivered twice</span>
+              </div>
+              <p class="sim-intro">
+                Each scenario creates one Nexus record and one IntegrationEvent, then sends that exact event to Prismatic twice concurrently. This tests delivery idempotency in the integration, not the existing HTTP <code>Idempotency-Key</code> handling on Nexus create endpoints.
+              </p>
+
+              <div class="idempotency-demo-grid">
+                <article class="idempotency-demo-card unsafe">
+                  <div class="idempotency-demo-icon">👥</div>
+                  <div>
+                    <span class="badge badge-danger">No integration guard</span>
+                    <h4>Customer duplicate delivery</h4>
+                    <p>Both executions reach the Odoo create action. Expected demonstration result: two Odoo contacts from one Nexus event.</p>
+                    <button class="btn btn-ghost-danger" onclick="App.openIdempotencyDemo('customer')">
+                      Create Customer Twice
+                    </button>
+                  </div>
+                </article>
+
+                <article class="idempotency-demo-card protected">
+                  <div class="idempotency-demo-icon">📦</div>
+                  <div>
+                    <span class="badge badge-success">Protected by Upstash</span>
+                    <h4>Product duplicate delivery</h4>
+                    <p>Only the first execution claims the event. Expected demonstration result: one Odoo product and one ignored duplicate.</p>
+                    <button class="btn btn-primary" onclick="App.openIdempotencyDemo('product')">
+                      Create Product Twice
+                    </button>
+                  </div>
+                </article>
+              </div>
+
+              <div class="idempotency-note">
+                <strong>Before running:</strong> configure the customer-visible <em>Upstash Redis</em> connection in the deployed Prismatic instance and make sure the Nexus webhook URL points to that instance.
+              </div>
             </div>
           </div>
 
@@ -760,12 +806,90 @@
     </div>
   </dialog>
 
+  <!-- 7. Duplicate Delivery Idempotency Demo Modal -->
+  <dialog id="modal-idempotency-demo" class="app-modal large">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h3 id="idempotency-demo-title">Duplicate Delivery Demo</h3>
+          <p id="idempotency-demo-description" class="help-text"></p>
+        </div>
+        <button class="btn-close" onclick="App.closeModal('modal-idempotency-demo')">&times;</button>
+      </div>
+
+      <form id="form-idempotency-demo" onsubmit="App.runIdempotencyDemo(event)">
+        <input type="hidden" id="idempotency-demo-entity-type">
+
+        <div id="idempotency-customer-fields">
+          <div class="form-group">
+            <label>Customer Name</label>
+            <input type="text" id="idempotency-customer-name" class="text-input" placeholder="e.g. Duplicate Delivery Customer">
+          </div>
+          <div class="form-group">
+            <label>Email Address</label>
+            <input type="email" id="idempotency-customer-email" class="text-input" placeholder="e.g. duplicate@example.com">
+          </div>
+          <div class="form-group">
+            <label>Phone Number</label>
+            <input type="text" id="idempotency-customer-phone" class="text-input" placeholder="e.g. +1-555-0100">
+          </div>
+        </div>
+
+        <div id="idempotency-product-fields" class="hidden">
+          <div class="form-group">
+            <label>SKU Code</label>
+            <input type="text" id="idempotency-product-sku" class="text-input" placeholder="e.g. IDEMP-12345">
+          </div>
+          <div class="form-group">
+            <label>Product Name</label>
+            <input type="text" id="idempotency-product-name" class="text-input" placeholder="e.g. Protected Demo Product">
+          </div>
+          <div class="form-row-2col">
+            <div class="form-group">
+              <label>Price ($ USD)</label>
+              <input type="number" step="0.01" min="0" id="idempotency-product-price" class="text-input" value="99.99">
+            </div>
+            <div class="form-group">
+              <label>Stock Quantity</label>
+              <input type="number" min="0" id="idempotency-product-stock" class="text-input" value="10">
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" onclick="App.closeModal('modal-idempotency-demo')">Close</button>
+          <button type="submit" id="idempotency-demo-submit" class="btn btn-primary">Send the Same Event Twice</button>
+        </div>
+      </form>
+
+      <div id="idempotency-demo-results" class="webhook-result-box hidden">
+        <div class="idempotency-result-header">
+          <div>
+            <h4>Duplicate Delivery Results</h4>
+            <p id="idempotency-demo-summary" class="help-text"></p>
+          </div>
+          <div class="mono idempotency-event-id" id="idempotency-demo-event-id"></div>
+        </div>
+        <div class="idempotency-output-grid">
+          <div class="output-box">
+            <div id="idempotency-delivery-1-status" class="status-code">Delivery 1</div>
+            <pre><code id="idempotency-delivery-1-output"></code></pre>
+          </div>
+          <div class="output-box">
+            <div id="idempotency-delivery-2-status" class="status-code">Delivery 2</div>
+            <pre><code id="idempotency-delivery-2-output"></code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
   <!-- Toast Notification Container -->
   <div id="toast-container" class="toast-container"></div>
 
   <!-- Prismatic Embedded SDK (pinned browser bundle for this static demo UI) -->
   <script src="https://unpkg.com/@prismatic-io/embedded@4.12.1/dist/index.umd.js"></script>
   <!-- Main JavaScript App Entry -->
-  <script src="/static/js/app.js?v=1.5"></script>
+  <script src="/static/js/app.js?v=1.6"></script>
 </body>
 </html>

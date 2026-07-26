@@ -7,6 +7,7 @@ services/
 ├── nexus-events/       # Nexus webhook events -> Odoo
 │   ├── index.ts        # Routes events by entity type
 │   ├── customer.ts     # Creates, updates, and deletes Odoo partners
+│   ├── idempotency.ts  # Claims product events in Upstash Redis
 │   └── product.ts      # Creates, updates, and archives Odoo products
 ├── odoo-to-nexus/      # Scheduled Odoo changes -> Nexus
 │   ├── index.ts        # Runs the delta sync and manages the cursor

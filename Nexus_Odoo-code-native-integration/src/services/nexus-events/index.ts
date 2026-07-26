@@ -1,6 +1,7 @@
 import type { FlowOnExecution, TriggerPayload } from "@prismatic-io/spectral";
 import type { NexusEventPayload } from "../nexus/types";
 import { syncCustomerEvent } from "./customer";
+import { withProductEventIdempotency } from "./idempotency";
 import { syncProductEvent } from "./product";
 
 export const executeNexusEventSync: FlowOnExecution<TriggerPayload> = async (
@@ -22,7 +23,11 @@ export const executeNexusEventSync: FlowOnExecution<TriggerPayload> = async (
     case "customer":
       return { data: await syncCustomerEvent(context, payload) };
     case "product":
-      return { data: await syncProductEvent(context, payload) };
+      return {
+        data: await withProductEventIdempotency(context, payload, () =>
+          syncProductEvent(context, payload),
+        ),
+      };
     case "order":
       logger.info("Order synchronization is not implemented; event ignored", {
         payload,

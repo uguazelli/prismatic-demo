@@ -16,7 +16,7 @@ const App = (function () {
     tenants: [],
     cachedProducts: [],
     orderWizardItems: [],
-    sandboxKey: "",
+    idempotencyDemoEntityType: null,
     prismaticInitialized: false,
     prismaticOrigin: null,
   };
@@ -139,7 +139,6 @@ const App = (function () {
     setupPrismaticEvents();
     updateOdooButton();
     checkHealth();
-    generateNewSandboxKey();
     switchTab("overview");
   }
 
@@ -326,7 +325,6 @@ const App = (function () {
         break;
       case "settings":
         loadPrismaticSettings();
-        generateNewSandboxKey();
         break;
     }
   }
@@ -1232,61 +1230,122 @@ const App = (function () {
     }
   }
 
-  // 8. IDEMPOTENCY SANDBOX TAB
-  function generateNewSandboxKey() {
-    state.sandboxKey = "idemp-" + Math.random().toString(36).substring(2, 10) + "-" + Date.now();
-    const inputEl = document.getElementById("sandbox-key");
-    if (inputEl) inputEl.value = state.sandboxKey;
+  // 8. DUPLICATE DELIVERY IDEMPOTENCY DEMO
+  function openIdempotencyDemo(entityType) {
+    const isCustomer = entityType === "customer";
+    const suffix = Date.now();
+    state.idempotencyDemoEntityType = entityType;
 
-    const outputBox = document.getElementById("sandbox-output-box");
-    if (outputBox) outputBox.classList.add("hidden");
+    document.getElementById("form-idempotency-demo").reset();
+    document.getElementById("idempotency-demo-entity-type").value = entityType;
+    document.getElementById("idempotency-customer-fields").classList.toggle("hidden", !isCustomer);
+    document.getElementById("idempotency-product-fields").classList.toggle("hidden", isCustomer);
+    document.getElementById("idempotency-demo-results").classList.add("hidden");
+
+    if (isCustomer) {
+      document.getElementById("idempotency-demo-title").textContent = "Customer: No Integration Idempotency";
+      document.getElementById("idempotency-demo-description").textContent =
+        "Nexus will create one customer and deliver its customer.created event twice. Both executions are allowed to reach Odoo.";
+      document.getElementById("idempotency-customer-name").value = `Duplicate Delivery Customer ${suffix}`;
+      document.getElementById("idempotency-customer-email").value = `duplicate-${suffix}@example.com`;
+      document.getElementById("idempotency-customer-phone").value = "+1-555-0100";
+    } else {
+      document.getElementById("idempotency-demo-title").textContent = "Product: Upstash Idempotency Guard";
+      document.getElementById("idempotency-demo-description").textContent =
+        "Nexus will create one product and deliver its product.created event twice. Upstash should allow only one Odoo create.";
+      document.getElementById("idempotency-product-sku").value = `IDEMP-${suffix}`;
+      document.getElementById("idempotency-product-name").value = `Protected Demo Product ${suffix}`;
+      document.getElementById("idempotency-product-price").value = "99.99";
+      document.getElementById("idempotency-product-stock").value = "10";
+    }
+
+    document.getElementById("modal-idempotency-demo").showModal();
   }
 
-  async function testIdempotencyRequest(stepNum) {
-    const key = state.sandboxKey;
-    const body = {
-      name: `Idempotency Test Customer (${key.substring(0, 10)})`,
-      email: `idemp-${Date.now()}@test.example`,
-      phone: "+1-555-0000",
-    };
+  function renderIdempotencyDelivery(result, deliveryNumber) {
+    const status = document.getElementById(`idempotency-delivery-${deliveryNumber}-status`);
+    const output = document.getElementById(`idempotency-delivery-${deliveryNumber}-output`);
 
-    const outputBox = document.getElementById("sandbox-output-box");
-    const statusBadge = document.getElementById("sandbox-status-badge");
-    const cachedFlag = document.getElementById("sandbox-cached-flag");
-    const outputCode = document.getElementById("sandbox-output-code");
+    if (result.status === "fulfilled") {
+      const prismaticStatus = result.value.data.status_code;
+      status.textContent = `Delivery ${deliveryNumber}: Prismatic HTTP ${prismaticStatus}`;
+      status.className = `status-code ${prismaticStatus >= 400 ? "text-danger" : "text-success"}`;
+      output.textContent = JSON.stringify(result.value.data, null, 2);
+      return;
+    }
 
-    if (outputBox) outputBox.classList.remove("hidden");
+    status.textContent = `Delivery ${deliveryNumber}: Failed`;
+    status.className = "status-code text-danger";
+    output.textContent = result.reason?.message || String(result.reason);
+  }
+
+  async function runIdempotencyDemo(e) {
+    e.preventDefault();
+    const entityType = state.idempotencyDemoEntityType;
+    const submitButton = document.getElementById("idempotency-demo-submit");
+    const resultBox = document.getElementById("idempotency-demo-results");
+
+    if (entityType !== "customer" && entityType !== "product") return;
+
+    const isCustomer = entityType === "customer";
+    const body = isCustomer
+      ? {
+          name: document.getElementById("idempotency-customer-name").value.trim(),
+          email: document.getElementById("idempotency-customer-email").value.trim(),
+          phone: document.getElementById("idempotency-customer-phone").value.trim() || null,
+        }
+      : {
+          sku: document.getElementById("idempotency-product-sku").value.trim(),
+          name: document.getElementById("idempotency-product-name").value.trim(),
+          price: parseFloat(document.getElementById("idempotency-product-price").value),
+          stock_quantity: parseInt(document.getElementById("idempotency-product-stock").value, 10),
+        };
+
+    submitButton.disabled = true;
+    submitButton.textContent = "Preparing one event...";
+    resultBox.classList.remove("hidden");
+    document.getElementById("idempotency-demo-summary").textContent = "Creating one Nexus record and one IntegrationEvent...";
+    document.getElementById("idempotency-demo-event-id").textContent = "";
+    document.getElementById("idempotency-delivery-1-output").textContent = "Waiting...";
+    document.getElementById("idempotency-delivery-2-output").textContent = "Waiting...";
 
     try {
-      const res = await apiFetch("/customers", {
-        method: "POST",
-        idempotencyKey: key,
-        body,
-      });
+      const preparePath = isCustomer ? "/demo/idempotency/customers" : "/demo/idempotency/products";
+      const prepared = await apiFetch(preparePath, { method: "POST", body });
+      const { event_id: eventId, entity_id: entityId } = prepared.data;
+      const deliveryPath = `/demo/idempotency/events/${eventId}/deliver`;
 
-      if (statusBadge) {
-        statusBadge.textContent = `HTTP ${res.status} OK`;
-        statusBadge.className = stepNum === 2 ? "badge badge-warning" : "badge badge-success";
-      }
-      if (cachedFlag) {
-        cachedFlag.textContent = stepNum === 2 ? "Intercepted: Returned cached response" : "Initial Request: Entity Created";
-      }
-      if (outputCode) {
-        outputCode.textContent = JSON.stringify(res.data, null, 2);
-      }
+      document.getElementById("idempotency-demo-event-id").textContent = `Event ID: ${eventId}`;
+      document.getElementById("idempotency-demo-summary").textContent =
+        `Created one Nexus ${entityType} (${entityId}). Sending the same event twice now...`;
+      submitButton.textContent = "Delivering twice...";
 
-      if (stepNum === 1) {
-        showToast("Initial request completed! Record created in database.", "success");
-      } else {
-        showToast("Duplicate request intercepted! Returned identical cached response.", "warning");
-      }
+      const results = await Promise.allSettled([
+        apiFetch(deliveryPath, { method: "POST" }),
+        apiFetch(deliveryPath, { method: "POST" }),
+      ]);
+
+      renderIdempotencyDelivery(results[0], 1);
+      renderIdempotencyDelivery(results[1], 2);
+      document.getElementById("idempotency-demo-summary").textContent = isCustomer
+        ? "Expected Odoo result: two contacts. A duplicate external-ID error may appear after the second contact has already been created."
+        : "Expected Odoo result: one product. One Prismatic execution should report the duplicate as ignored.";
+
+      showToast(
+        isCustomer
+          ? "Customer event delivered twice without an integration guard."
+          : "Product event delivered twice with the Upstash guard.",
+        isCustomer ? "warning" : "success",
+      );
+      loadEvents();
+      if (isCustomer) loadCustomers();
+      else loadProducts();
     } catch (err) {
-      if (statusBadge) {
-        statusBadge.textContent = `HTTP Error`;
-        statusBadge.className = "badge badge-danger";
-      }
-      if (cachedFlag) cachedFlag.textContent = "";
-      if (outputCode) outputCode.textContent = err.message;
+      document.getElementById("idempotency-demo-summary").textContent = `Demo failed: ${err.message}`;
+      showToast(`Idempotency demo failed: ${err.message}`, "error");
+    } finally {
+      submitButton.disabled = false;
+      submitButton.textContent = "Send the Same Event Twice";
     }
   }
 
@@ -1361,8 +1420,8 @@ const App = (function () {
     loadTenants,
     openCreateTenantModal,
     saveTenant,
-    generateNewSandboxKey,
-    testIdempotencyRequest,
+    openIdempotencyDemo,
+    runIdempotencyDemo,
     switchSettingsSubtab,
     closeModal,
   };

@@ -16,7 +16,13 @@ def get_customer(db: Session, tenant_id: str, customer_id: str) -> Customer:
     return customer
 
 
-def create_customer(db: Session, tenant_id: str, data: CustomerCreate) -> Customer:
+def create_customer(
+    db: Session,
+    tenant_id: str,
+    data: CustomerCreate,
+    *,
+    event_status: str = "pending",
+) -> Customer:
     customer = Customer(tenant_id=tenant_id, **data.model_dump())
     db.add(customer)
     db.flush()
@@ -27,6 +33,7 @@ def create_customer(db: Session, tenant_id: str, data: CustomerCreate) -> Custom
         entity_type="customer",
         entity_id=customer.id,
         payload=CustomerRead.model_validate(customer).model_dump(mode="json"),
+        status=event_status,
     )
     return customer
 
